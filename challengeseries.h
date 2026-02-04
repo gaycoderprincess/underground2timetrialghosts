@@ -130,6 +130,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4042, "DEMO_PRESET_4", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4086, "DEMO_AI_IMPREZAWRX_BLUE", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4608, "NIKKI_MUSTANGGT", EVENT_SHORT_TRACK, 3),
+		ChallengeSeriesEvent(4012, "PresetCar/MIATA_CINGULAR", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4141, "SCOTT_TT", EVENT_RACE),
 		ChallengeSeriesEvent(4703, "SHINESTREET", EVENT_RACE, 2, true),
 		ChallengeSeriesEvent(4144, "MARCUS_CELICA", EVENT_RACE),
