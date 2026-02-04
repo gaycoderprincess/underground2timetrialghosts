@@ -24,10 +24,10 @@ enum eCwoeeEventType {
 Car* GetNthCar(int n) {
 	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) return nullptr;
 	if (!pCurrentWorld) return nullptr;
-	auto car = pCurrentWorld->pCarTable;
+	auto car = pCurrentWorld->CarTable.HeadNode.Next;
 	for (int i = 0; i < n; i++) {
-		car = car->pNext;
-		if (!car || car == (Car*)pCurrentWorld) return nullptr;
+		car = car->Next;
+		if (!car || car == &pCurrentWorld->CarTable.HeadNode) return nullptr;
 	}
 	return car;
 }
