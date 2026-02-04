@@ -1,5 +1,5 @@
 std::string GetCarNameForGhost(const std::string& carPreset) {
-	auto car = FindFEPresetCar(FEHashUpper(carPreset.c_str()));
+	auto car = FindFEPresetCar(bStringHash(carPreset.c_str()));
 	std::string carName = car ? car->CarTypeName : carPreset;
 	if (carName.starts_with("STOCK_")) {
 		for (int i = 0; i < 6; i++) {
@@ -22,6 +22,8 @@ public:
 	tReplayGhost PBGhost;
 	tReplayGhost aTargetGhosts[NUM_DIFFICULTY] = {};
 	int nNumGhosts[NUM_DIFFICULTY] = {};
+
+	PresetCar PresetCarData = {};
 
 	ChallengeSeriesEvent(int trackId, const char* carPreset, eCwoeeEventType eventType, int lapCount = 0, bool reversed = false) : nTrackNumber(trackId), sCarPreset(carPreset), nEventType(eventType), nLapCountOverride(lapCount), bReversed(reversed) {}
 
@@ -125,7 +127,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4014, "CAPONE", EVENT_RACE, 1),
 		ChallengeSeriesEvent(4022, "D3", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4063, "DEMO_AI_300GT_ORANGE", EVENT_RACE, 1),
-		ChallengeSeriesEvent(4042, "DEMO_PRESET_2", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4042, "DEMO_PRESET_4", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4086, "DEMO_AI_IMPREZAWRX_BLUE", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4608, "NIKKI_MUSTANGGT", EVENT_SHORT_TRACK, 3),
 		ChallengeSeriesEvent(4141, "SCOTT_TT", EVENT_RACE),
@@ -137,6 +139,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4121, "JAPANTUNING", EVENT_RACE),
 		ChallengeSeriesEvent(4164, "DEMO_AI_350Z_BROWN", EVENT_RACE),
 		ChallengeSeriesEvent(4601, "THE_DOORS", EVENT_SHORT_TRACK, 3),
+		ChallengeSeriesEvent(4716, "PresetCar/RX7_CUSTOM", EVENT_RACE, 2, true),
 		ChallengeSeriesEvent(4701, "NIGEL_3000GT", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG),
 		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
@@ -198,7 +201,8 @@ void ChallengeSeriesMenu() {
 		if (event.nEventType == EVENT_DRAG) continue; // drag races start with automatic transmission????
 
 		auto carName = GetLocalizedString(FEngHashString(std::format("CAR_NAME_{}", event.GetCarModelName()).c_str()));
-		auto trackName = (std::string)GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, event.bReversed));
+		auto trackName = (std::string)GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, false));
+		if (event.bReversed) trackName += " Reversed";
 		if (trackName.starts_with("Bayview Speedway Track ")) {
 			trackName.erase(trackName.begin(), trackName.begin() + 23);
 			trackName = "Bayview Speedway " + trackName;
@@ -228,8 +232,40 @@ void __thiscall RideInfoInitHooked(RideInfo* pThis, int a1, int a2, int a3, int 
 	RideInfo::SetCompositeNameHash(pThis, 1);
 }
 
+PresetCar* FindFEPresetCarHooked(uint32_t hash) {
+	for (auto& event : aNewChallengeSeries) {
+		if (event.sCarPreset.find('/') == std::string::npos) continue;
+		if (hash == bStringHash(event.sCarPreset.c_str())) {
+			if (event.PresetCarData.PresetName[0]) return &event.PresetCarData;
+
+			std::ifstream file(std::format("{}/CwoeeGhosts/{}", gDLLPath.string(), event.sCarPreset), std::ios::in | std::ios::binary);
+			if (!file.is_open()) {
+				MessageBoxA(nullptr, std::format("Failed to find preset car {}", event.sCarPreset).c_str(), "nya?!~", MB_ICONERROR);
+				exit(0);
+			}
+
+			auto preset = &event.PresetCarData;
+			memset(preset, 0, sizeof(*preset));
+			file.read((char*)preset, sizeof(*preset));
+			preset->PhysicsLevel = 3;
+			return preset;
+		}
+	}
+
+	auto node = PresetCarList.HeadNode.Next;
+	while (node != &PresetCarList.HeadNode) {
+		if (hash == FEHashUpper(node->PresetName)) {
+			return node;
+		}
+		node = node->Next;
+	}
+	return nullptr;
+}
+
 void ApplyChallengeSeriesPatches() {
 	NyaHookLib::PatchRelative(NyaHookLib::CALL, 0x5401B7, &RideInfoInitHooked);
 	NyaHookLib::Patch<uint16_t>(0x5401E4, 0x9090);
 	NyaHookLib::Patch(0x5401E8, &nChallengeSeriesCar);
+
+	NyaHookLib::PatchRelative(NyaHookLib::JMP, 0x61C460, &FindFEPresetCarHooked);
 }
