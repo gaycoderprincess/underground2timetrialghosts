@@ -10,25 +10,45 @@
 #include "nfsug2.h"
 #include "chloemenulib.h"
 
+bool bChallengeSeriesMode = false;
+
 #include "util.h"
-#include "challengeseries.h"
 #include "timetrials.h"
+#include "challengeseries.h"
 
 void HookLoop() {}
 
 uint32_t nCarBlinkCounter = 0;
-void MainLoop() {
+void MainLoop(float delta) {
+	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) bChallengeSeriesMode = false;
+
 	DLLDirSetter _setdir;
 
-	static CNyaTimer gTimer;
-	gTimer.Process();
-
-	if (gTimer.fTotalTime > 1.0 / 15.0) {
+	static double time = 0;
+	time += delta;
+	if (time > 1.0 / 15.0) {
 		nCarBlinkCounter = !nCarBlinkCounter;
-		gTimer.fTotalTime -= 1.0 / 15.0;
+		time -= 1.0 / 15.0;
 	}
 
-	TimeTrialLoop(gTimer.fDeltaTime);
+	TimeTrialLoop(delta);
+}
+
+void RenderLoop() {
+	UnlockAllThings = true;
+	
+	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) bChallengeSeriesMode = false;
+
+	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) {
+		InvalidateGhost();
+		return;
+	}
+
+	bool isInRace = TheRaceParameters.RaceType != RACE_TYPE_NONE && pCurrentRace;
+	if (!isInRace) {
+		InvalidateGhost();
+		return;
+	}
 }
 
 // force all MellowMover sets to be PhysicsMover
@@ -94,7 +114,9 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
 			ApplyChallengeSeriesPatches();
 
 			NyaHooks::PlaceD3DHooks();
-			NyaHooks::D3DEndSceneHook::aFunctions.push_back(MainLoop);
+			NyaHooks::D3DEndSceneHook::aFunctions.push_back(RenderLoop);
+			NyaHooks::WorldTimestepHook::Init();
+			NyaHooks::WorldTimestepHook::aFunctions.push_back(MainLoop);
 			NyaHookLib::Patch(0x60D55D, &nCarBlinkCounter);
 
 			NyaHookLib::Patch<uint8_t>(0x5EBD9B, 0xEB); // disable drafting bonus

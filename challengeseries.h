@@ -1,4 +1,3 @@
-bool bChallengeSeriesMode = false;
 uint32_t nChallengeSeriesCar = 0;
 class ChallengeSeriesEvent {
 public:
@@ -30,6 +29,8 @@ public:
 	}
 
 	void SetupEvent() const {
+		DoConfigSave();
+
 		bChallengeSeriesMode = true;
 		nChallengeSeriesCar = bStringHash(sCarPreset.c_str());
 		ForceAllAICarsToBeThisType = GetCarID();
@@ -45,7 +46,7 @@ public:
 		SkipFEShortTrackRace = nEventType == EVENT_SHORT_TRACK;
 		SkipFEPoint2Point = TrackInfo::GetTrackInfo(nTrackNumber)->Point2Point;
 		SkipFENumPlayerCars = 1;
-		SkipFENumAICars = 3;
+		SkipFENumAICars = bChallengesOneGhostOnly ? 1 : 3;
 		SkipFEPlayerCarUpgrades[0] = 3; // full upgrades
 
 		int laps = nLapCountOverride;
@@ -107,6 +108,24 @@ THE_DOORS - GTO
 TOM_G35 - G35
 TT_AI_PRESET_1 - TT
 */
+
+void ChallengeSeriesMenu() {
+	for (auto& event : aNewChallengeSeries) {
+		auto car = FindFEPresetCar(FEHashUpper(event.sCarPreset.c_str()));
+		std::string carName = car ? car->CarTypeName : event.sCarPreset;
+		if (carName.starts_with("STOCK_")) {
+			for (int i = 0; i < 6; i++) {
+				carName.erase(carName.begin());
+			}
+		}
+		carName = GetLocalizedString(FEngHashString(std::format("CAR_NAME_{}", carName).c_str()));
+		auto trackName = GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, event.bReversed));
+
+		if (DrawMenuOption(std::format("{} - {}", trackName, carName))) {
+			event.SetupEvent();
+		}
+	}
+}
 
 void __thiscall RideInfoInitHooked(RideInfo* pThis, int a1, int a2, int a3, int a4) {
 	RideInfo::Init(pThis, a1, a2, a3, a4);

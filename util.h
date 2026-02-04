@@ -22,16 +22,18 @@ enum eCwoeeEventType {
 };
 
 Car* GetNthCar(int n) {
+	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) return nullptr;
 	if (!pCurrentWorld) return nullptr;
 	auto car = pCurrentWorld->pCarTable;
 	for (int i = 0; i < n; i++) {
 		car = car->pNext;
-		if (!car) return nullptr;
+		if (!car || car == (Car*)pCurrentWorld) return nullptr;
 	}
 	return car;
 }
 
 int GetNumCarsInWorld() {
+	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) return 0;
 	return pCurrentWorld->nNumCars;
 }
 

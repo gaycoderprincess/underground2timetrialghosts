@@ -754,10 +754,7 @@ void DisplayPlayerNames() {
 }
 
 void TimeTrialRenderLoop() {
-	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) {
-		InvalidateGhost();
-		return;
-	}
+	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) return;
 	if (IsInLoadingScreen()) return;
 
 	DisplayLeaderboard();
@@ -782,119 +779,125 @@ void TimeTrialRenderLoop() {
 	DisplayPlayerNames();
 }
 
+void ChallengeSeriesMenu();
+
 void DebugMenu() {
 	ChloeMenuLib::BeginMenu();
 
-	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_RACING) {
-		DrawMenuOption(std::format("NoCountdown - {}", fGlobalReplayTimerNoCountdown));
-		DrawMenuOption(std::format("Timer - {}", fGlobalReplayTimer));
-		DrawMenuOption(std::format("MovieIsStarted - {}", MovieIsStarted));
-		DrawMenuOption(std::format("IsPlayingIntroNIS - {}", CAnimManager::IsPlayingIntroNIS(&TheAnimManager)));
-		DrawMenuOption(std::format("IsPlayingEndNIS - {}", CAnimManager::IsPlayingEndNIS(&TheAnimManager)));
-		DrawMenuOption(std::format("GetCountdownNumberToDisplay - {}", Race::GetCountdownNumberToDisplay(pCurrentRace)));
-		DrawMenuOption(std::format("bFinishedRacing - {}", Player::pPlayersByIndex[0]->bFinishedRacing));
-	}
-
-	QuickValueEditor("Player Name Override", sPlayerNameOverride, sizeof(sPlayerNameOverride));
-
-	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_RACING) {
-		if (DrawMenuOption("Quit Event")) {
-			SkipFE = false;
-			GameFlowManager::UnloadTrack(&TheGameFlowManager);
+	if (DrawMenuOption("Challenge Series")) {
+		ChloeMenuLib::BeginMenu();
+		if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_RACING) {
+			if (DrawMenuOption("Quit Event")) {
+				SkipFE = false;
+				CAnimManager::EndNIS_SafeRemove(&TheAnimManager);
+				cFrontendDatabase::NotifyExitRaceToFrontend(&FEDatabase, false);
+				GameFlowManager::UnloadTrack(&TheGameFlowManager);
+			}
 		}
+		else {
+			ChallengeSeriesMenu();
+		}
+		ChloeMenuLib::EndMenu();
 	}
-	else {
-		if (DrawMenuOption("Launch Event")) {
-			ChloeMenuLib::BeginMenu();
-			for (auto& event: aNewChallengeSeries) {
-				auto car = FindFEPresetCar(FEHashUpper(event.sCarPreset.c_str()));
-				std::string carName = car ? car->CarTypeName : event.sCarPreset;
-				if (carName.starts_with("STOCK_")) {
-					for (int i = 0; i < 6; i++) {
-						carName.erase(carName.begin());
+
+	if (DrawMenuOption("Options")) {
+		ChloeMenuLib::BeginMenu();
+
+		QuickValueEditor("Player Name Override", sPlayerNameOverride, sizeof(sPlayerNameOverride));
+
+		if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND) {
+			QuickValueEditor("Replay Viewer", bViewReplayMode);
+			if (bViewReplayMode) {
+				if (DrawMenuOption(std::format("Replay Viewer Ghost - {}", bViewReplayTargetTime ? "Target Time" : "Personal Best"))) {
+					bViewReplayTargetTime = !bViewReplayTargetTime;
+				}
+			}
+			if (bChallengeSeriesMode) {
+				const char* difficultyNames[] = {
+						"Easy",
+						"Normal",
+						"Hard",
+						"Very Hard",
+				};
+				const char* difficultyDescs[] = {
+						"Easier ghosts",
+						"Average ghosts",
+						"Faster community ghosts",
+						"Speedrunners' community ghosts",
+				};
+				if (DrawMenuOption(std::format("Difficulty - {}", difficultyNames[nDifficulty]))) {
+					ChloeMenuLib::BeginMenu();
+					for (int i = 0; i < NUM_DIFFICULTY; i++) {
+						if (DrawMenuOption(difficultyNames[i], difficultyDescs[i])) {
+							nDifficulty = (eDifficulty)i;
+						}
+					}
+					ChloeMenuLib::EndMenu();
+				}
+				if (nDifficulty != DIFFICULTY_EASY) {
+					QuickValueEditor("Show Target Ghost Only", bChallengesOneGhostOnly);
+					if (DrawMenuOption(std::format("Show Personal Ghost - {}", bChallengesPBGhost))) {
+						bChallengesPBGhost = !bChallengesPBGhost;
 					}
 				}
-				carName = GetLocalizedString(FEngHashString(std::format("CAR_NAME_{}", carName).c_str()));
-				auto trackName = GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, event.bReversed));
-
-				if (DrawMenuOption(std::format("{} - {}", trackName, carName))) {
-					event.SetupEvent();
-				}
 			}
-			ChloeMenuLib::EndMenu();
-		}
-	}
+			else {
+				QuickValueEditor("Opponent Ghosts Only", bPracticeOpponentsOnly);
 
+				if (bViewReplayMode) bPracticeOpponentsOnly = false;
 
-	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND) {
-		QuickValueEditor("Replay Viewer", bViewReplayMode);
-		if (bViewReplayMode) {
-			if (DrawMenuOption(std::format("Replay Viewer Ghost - {}", bViewReplayTargetTime ? "Target Time" : "Personal Best"))) {
-				bViewReplayTargetTime = !bViewReplayTargetTime;
-			}
-		}
-		if (bChallengeSeriesMode) {
-			const char* difficultyNames[] = {
-					"Easy",
-					"Normal",
-					"Hard",
-					"Very Hard",
-			};
-			const char* difficultyDescs[] = {
-					"Easier ghosts",
-					"Average ghosts",
-					"Faster community ghosts",
-					"Speedrunners' community ghosts",
-			};
-			if (DrawMenuOption(std::format("Difficulty - {}", difficultyNames[nDifficulty]))) {
-				ChloeMenuLib::BeginMenu();
-				for (int i = 0; i < NUM_DIFFICULTY; i++) {
-					if (DrawMenuOption(difficultyNames[i], difficultyDescs[i])) {
-						nDifficulty = (eDifficulty)i;
+				if (DrawMenuOption("NOS")) {
+					ChloeMenuLib::BeginMenu();
+					if (DrawMenuOption("Off")) {
+						nNitroType = NITRO_OFF;
 					}
+					if (DrawMenuOption("On")) {
+						nNitroType = NITRO_ON;
+					}
+					if (DrawMenuOption("Infinite")) {
+						nNitroType = NITRO_INF;
+					}
+					ChloeMenuLib::EndMenu();
 				}
-				ChloeMenuLib::EndMenu();
 			}
-			if (nDifficulty != DIFFICULTY_EASY) {
-				QuickValueEditor("Show Target Ghost Only", bChallengesOneGhostOnly);
+		}
+		else {
+			if (bChallengeSeriesMode) {
 				if (DrawMenuOption(std::format("Show Personal Ghost - {}", bChallengesPBGhost))) {
 					bChallengesPBGhost = !bChallengesPBGhost;
 				}
 			}
 		}
-		else {
-			QuickValueEditor("Opponent Ghosts Only", bPracticeOpponentsOnly);
 
-			if (bViewReplayMode) bPracticeOpponentsOnly = false;
-
-			if (DrawMenuOption("NOS")) {
-				ChloeMenuLib::BeginMenu();
-				if (DrawMenuOption("Off")) {
-					nNitroType = NITRO_OFF;
-				}
-				if (DrawMenuOption("On")) {
-					nNitroType = NITRO_ON;
-				}
-				if (DrawMenuOption("Infinite")) {
-					nNitroType = NITRO_INF;
-				}
-				ChloeMenuLib::EndMenu();
+		if (DrawMenuOption("Ghost Visuals")) {
+			ChloeMenuLib::BeginMenu();
+			if (DrawMenuOption("Hidden")) {
+				nGhostVisuals = GHOST_HIDE;
 			}
+			if (DrawMenuOption("Shown")) {
+				nGhostVisuals = GHOST_SHOW;
+			}
+			if (DrawMenuOption("Hide Too Close")) {
+				nGhostVisuals = GHOST_HIDE_NEARBY;
+			}
+			ChloeMenuLib::EndMenu();
 		}
+
+		ChloeMenuLib::EndMenu();
 	}
 
-	if (DrawMenuOption("Ghost Visuals")) {
-		ChloeMenuLib::BeginMenu();
-		if (DrawMenuOption("Hidden")) {
-			nGhostVisuals = GHOST_HIDE;
+	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_RACING) {
+		if (DrawMenuOption("Debug")) {
+			ChloeMenuLib::BeginMenu();
+			DrawMenuOption(std::format("NoCountdown - {}", fGlobalReplayTimerNoCountdown));
+			DrawMenuOption(std::format("Timer - {}", fGlobalReplayTimer));
+			DrawMenuOption(std::format("MovieIsStarted - {}", MovieIsStarted));
+			DrawMenuOption(std::format("IsPlayingIntroNIS - {}", CAnimManager::IsPlayingIntroNIS(&TheAnimManager)));
+			DrawMenuOption(std::format("IsPlayingEndNIS - {}", CAnimManager::IsPlayingEndNIS(&TheAnimManager)));
+			DrawMenuOption(std::format("GetCountdownNumberToDisplay - {}", Race::GetCountdownNumberToDisplay(pCurrentRace)));
+			DrawMenuOption(std::format("bFinishedRacing - {}", Player::pPlayersByIndex[0]->bFinishedRacing));
+			ChloeMenuLib::EndMenu();
 		}
-		if (DrawMenuOption("Shown")) {
-			nGhostVisuals = GHOST_SHOW;
-		}
-		if (DrawMenuOption("Hide Too Close")) {
-			nGhostVisuals = GHOST_HIDE_NEARBY;
-		}
-		ChloeMenuLib::EndMenu();
 	}
 
 	DrawMenuOption(std::format("Race - {}", TheRaceParameters.TrackNumber));
