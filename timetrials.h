@@ -1,4 +1,4 @@
-const int nLocalReplayVersion = 1;
+const int nLocalReplayVersion = 2;
 const int nMaxNumGhostsToCheck = 16;
 const int nPlayerNameLength = 16;
 const int nMinGhostTicks = 30;
@@ -28,8 +28,9 @@ enum eDifficulty {
 	NUM_DIFFICULTY,
 };
 int nDifficulty = DIFFICULTY_HARD;
-bool bChallengesPBGhost = false;
 bool bChallengesOneGhostOnly = false;
+bool bChallengesPBGhost = false;
+bool bCheckFileIntegrity = false;
 bool bPracticeOpponentsOnly = false;
 
 void DoConfigSave() {
@@ -43,6 +44,7 @@ void DoConfigSave() {
 	file.write((char*)&bChallengesPBGhost, sizeof(bChallengesPBGhost));
 	file.write((char*)&bPracticeOpponentsOnly, sizeof(bPracticeOpponentsOnly));
 	file.write((char*)&nNitroType, sizeof(nNitroType));
+	file.write((char*)&bCheckFileIntegrity, sizeof(bCheckFileIntegrity));
 }
 
 void DoConfigLoad() {
@@ -57,6 +59,7 @@ void DoConfigLoad() {
 	file.read((char*)&bChallengesPBGhost, sizeof(bChallengesPBGhost));
 	file.read((char*)&bPracticeOpponentsOnly, sizeof(bPracticeOpponentsOnly));
 	file.read((char*)&nNitroType, sizeof(nNitroType));
+	file.read((char*)&bCheckFileIntegrity, sizeof(bCheckFileIntegrity));
 }
 
 bool IsPracticeMode() {
@@ -101,6 +104,7 @@ struct tReplayTick {
 	}
 };
 
+uint32_t nLocalGameFilesHash = 0;
 struct tReplayGhost {
 public:
 	std::vector<tReplayTick> aTicks;
@@ -109,6 +113,7 @@ public:
 	uint32_t nFinishPoints;
 	std::string sPlayerName;
 	Car* pLastVehicle;
+	uint32_t nGameFilesHash;
 	bool bIsPersonalBest;
 
 	tReplayGhost() {
@@ -137,6 +142,7 @@ public:
 		nFinishPoints = 0;
 		sPlayerName = "";
 		pLastVehicle = nullptr;
+		nGameFilesHash = 0;
 		bIsPersonalBest = false;
 	}
 
@@ -320,6 +326,7 @@ void SavePB(tReplayGhost* ghost, const std::string& car, int track, int lapCount
 	auto name = GetLocalPlayerName();
 	if (sPlayerNameOverride[0]) name = sPlayerNameOverride;
 	outFile.write(name, nPlayerNameLength);
+	outFile.write((char*)&nLocalGameFilesHash, sizeof(nLocalGameFilesHash));
 	int count = ghost->aTicks.size();
 	outFile.write((char*)&count, sizeof(count));
 	outFile.write((char*)&ghost->aTicks[0], sizeof(ghost->aTicks[0]) * count);
@@ -329,9 +336,7 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 	bool doNOSSpdbrkChecks = IsPracticeMode();
 	bool doUpgradeChecks = IsPracticeMode();
 
-	ghost->aTicks.clear();
-	ghost->nFinishTime = 0;
-	ghost->nFinishPoints = 0;
+	ghost->Invalidate();
 
 	auto fileName = GetGhostFilename(car, track, trackReversed, lapCount, opponentId, folder);
 	auto inFile = std::ifstream(fileName, std::ios::in | std::ios::binary);
@@ -358,6 +363,7 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 	}
 
 	int tmpstarttime, tmptime, tmppoints, tmpnitro, tmplaps, tmptrack;
+	uint32_t fileHash = 0;
 	char tmpplayername[nPlayerNameLength];
 	strcpy_s(tmpplayername, opponentId ? "OPPONENT" : "PB GHOST");
 	auto tmpcar = ReadStringFromFile(inFile);
@@ -368,6 +374,10 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 	inFile.read((char*)&tmpnitro, sizeof(tmpnitro));
 	inFile.read((char*)&tmplaps, sizeof(tmplaps));
 	inFile.read(tmpplayername, sizeof(tmpplayername));
+	if (fileVersion >= 2) {
+		inFile.read((char*)&fileHash, sizeof(fileHash));
+		if (!fileHash) fileHash = 0xFFFFFFFF;
+	}
 	if (tmpcar != car || tmptrack != track) {
 		WriteLog("Mismatched ghost for " + fileName);
 		return;
@@ -398,6 +408,7 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 	ghost->nStartTime = tmpstarttime;
 	ghost->nFinishTime = tmptime;
 	ghost->nFinishPoints = tmppoints;
+	ghost->nGameFilesHash = fileHash;
 
 	// don't needlessly load the full ghost data when previewing times in the menu
 	if (TheGameFlowManager.CurrentGameFlowState <= GAMEFLOW_STATE_IN_FRONTEND) return;
@@ -628,6 +639,11 @@ std::string GetRealPlayerName(const std::string& ghostName) {
 	return ghostName;
 }
 
+std::string GetGameDataHashName(uint32_t hash) {
+	if (hash == 0xCC654017) return "1.2 Vanilla";
+	return std::format("{:X}", hash);
+}
+
 float fLeaderboardX = 0.03;
 float fLeaderboardY = 0.6;
 float fLeaderboardYSpacing = 0.03;
@@ -675,11 +691,7 @@ void DisplayLeaderboard() {
 			uniquePlayers.push_back(name);
 
 			if (ghost.bIsPersonalBest) {
-#ifdef TIMETRIALS_CARBON
 				data.SetColor(126, 246, 240, 255);
-#else
-				data.SetColor(245, 185, 110, 255);
-#endif
 			}
 			else {
 				data.SetColor(255, 255, 255, 255);
@@ -694,6 +706,14 @@ void DisplayLeaderboard() {
 				auto time = GetTimeFromMilliseconds(ghost.nFinishTime);
 				time.pop_back();
 				str = std::format("{}. {} - {}", ranking++, name, time);
+			}
+			if (bCheckFileIntegrity) {
+				if (!ghost.nGameFilesHash) {
+					str += " (Old ghost, no game data info)";
+				}
+				else if (ghost.nGameFilesHash != nLocalGameFilesHash) {
+					str += std::format(" (Game data mismatch, {})", GetGameDataHashName(ghost.nGameFilesHash));
+				}
 			}
 			DrawString(data, str);
 			data.y += fLeaderboardYSpacing;
@@ -889,6 +909,9 @@ void DebugMenu() {
 			}
 			ChloeMenuLib::EndMenu();
 		}
+
+		QuickValueEditor("Verify Game Data Integrity", bCheckFileIntegrity);
+		DrawMenuOption(std::format("Game Data Hash: {:X}", nLocalGameFilesHash));
 
 		ChloeMenuLib::EndMenu();
 	}

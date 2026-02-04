@@ -13,10 +13,10 @@
 bool bChallengeSeriesMode = false;
 
 #include "util.h"
+#include "d3dhook.h"
 #include "timetrials.h"
 #include "challengeseries.h"
-
-void HookLoop() {}
+#include "../MostWantedTimeTrialGhosts/verification.h"
 
 uint32_t nCarBlinkCounter = 0;
 void MainLoop(float delta) {
@@ -49,6 +49,8 @@ void RenderLoop() {
 		InvalidateGhost();
 		return;
 	}
+
+	TimeTrialRenderLoop();
 }
 
 // force all MellowMover sets to be PhysicsMover
@@ -113,10 +115,19 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
 
 			ApplyChallengeSeriesPatches();
 
-			NyaHooks::PlaceD3DHooks();
-			NyaHooks::D3DEndSceneHook::aFunctions.push_back(RenderLoop);
 			NyaHooks::WorldTimestepHook::Init();
 			NyaHooks::WorldTimestepHook::aFunctions.push_back(MainLoop);
+			NyaHooks::LateInitHook::Init();
+			NyaHooks::LateInitHook::aPreFunctions.push_back(FileIntegrity::VerifyGameFiles);
+			NyaHooks::LateInitHook::aFunctions.push_back([]() {
+				NyaHooks::PlaceD3DHooks();
+				NyaHooks::D3DEndSceneHook::aPreFunctions.push_back(CollectPlayerPos);
+				NyaHooks::D3DEndSceneHook::aFunctions.push_back(D3DHookMain);
+				NyaHooks::D3DEndSceneHook::aFunctions.push_back(CheckPlayerPos);
+				NyaHooks::D3DResetHook::aFunctions.push_back(OnD3DReset);
+
+				ApplyVerificationPatches();
+			});
 			NyaHookLib::Patch(0x60D55D, &nCarBlinkCounter);
 
 			NyaHookLib::Patch<uint8_t>(0x5EBD9B, 0xEB); // disable drafting bonus
