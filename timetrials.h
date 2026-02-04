@@ -440,6 +440,7 @@ void OnFinishRace() {
 			ghost->nStartTime = (fGlobalReplayTimer - fGlobalReplayTimerNoCountdown) * 1000;
 			ghost->nFinishTime = replayTime;
 			ghost->nFinishPoints = replayPoints;
+			ghost->nGameFilesHash = nLocalGameFilesHash;
 			SavePB(ghost, CarTypeInfoArray[PlayerCarType].CarTypeName, TheRaceParameters.TrackNumber, TheRaceParameters.NumLapsInRace);
 
 			if (bChallengeSeriesMode) {
@@ -662,6 +663,7 @@ void DisplayLeaderboard() {
 			dummy.sPlayerName = sPlayerNameOverride[0] ? sPlayerNameOverride : GetLocalPlayerName();
 			dummy.nFinishTime = PlayerPBGhost.nFinishTime;
 			dummy.nFinishPoints = PlayerPBGhost.nFinishPoints;
+			dummy.nGameFilesHash = PlayerPBGhost.nGameFilesHash;
 			dummy.bIsPersonalBest = true;
 			leaderboard.push_back(dummy);
 
