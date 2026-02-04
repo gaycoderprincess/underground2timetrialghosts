@@ -1,4 +1,4 @@
-const int nLocalReplayVersion = 2;
+const int nLocalReplayVersion = 3;
 const int nMaxNumGhostsToCheck = 16;
 const int nPlayerNameLength = 16;
 const int nMinGhostTicks = 30;
@@ -72,8 +72,11 @@ double fGlobalReplayTimerNoCountdown = 0;
 struct tReplayTick {
 	struct tTickVersion1 {
 		RigidBodyState state;
-		double timer; // todo
+		double timer;
 	} v1;
+	struct tTickVersion2 {
+		int points;
+	} v2;
 
 	void Collect(Car* pVehicle) {
 		if (pVehicle->nMovementMode != PHYSICS_MOVEMENT) {
@@ -88,6 +91,12 @@ struct tReplayTick {
 		}
 		v1.state = rb->State;
 		v1.timer = fGlobalReplayTimer;
+
+		v2.points = 0;
+		if (TheRaceParameters.bDriftRaceFlag) {
+			auto score = DriftManager::GetLeaderBoardScore(pVehicle->pDriverInfo->DriverNumber);
+			v2.points = score ? score->fScore : 0;
+		}
 	}
 
 	void Apply(Car* pVehicle) {
@@ -100,7 +109,10 @@ struct tReplayTick {
 		if (!rb) return;
 		rb->State = v1.state;
 
-		Car::StartBlinking(pVehicle, 0.5);
+		if (TheRaceParameters.bDriftRaceFlag) {
+			auto score = DriftManager::GetLeaderBoardScore(pVehicle->pDriverInfo->DriverNumber);
+			if (score) score->fScore = v2.points;
+		}
 	}
 };
 
@@ -160,6 +172,7 @@ public:
 		auto delta = (raceTime - pClosestWithoutGoingOver->v1.timer) / (pNextTick->v1.timer - pClosestWithoutGoingOver->v1.timer);
 
 		static tReplayTick InterpolatedTick;
+		InterpolatedTick = *pClosestWithoutGoingOver;
 		for (int i = 0; i < sizeof(RigidBodyState) / sizeof(float); i++) {
 			auto fLast = (float*)&pClosestWithoutGoingOver->v1.state;
 			auto fNext = (float*)&pNextTick->v1.state;
@@ -168,6 +181,13 @@ public:
 		}
 		InterpolatedTick.v1.timer = raceTime;
 		return &InterpolatedTick;
+	}
+
+	void ApplyFinalScore(Car* pVehicle) {
+		if (TheRaceParameters.bDriftRaceFlag) {
+			auto score = DriftManager::GetLeaderBoardScore(pVehicle->pDriverInfo->DriverNumber);
+			if (score) score->fScore = nFinishPoints;
+		}
 	}
 };
 tReplayGhost PlayerPBGhost;
@@ -209,24 +229,26 @@ void InvalidateLocalGhost() {
 	aRecordingTicks.clear();
 }
 
-void RunGhost(Car* veh, DriverInfo* driver, tReplayGhost* ghost) {
+void RunGhost(Car* veh, tReplayGhost* ghost) {
 	if (!ghost) return;
 	if (!veh) return;
-	if (!driver) return;
 	ghost->pLastVehicle = veh;
+	Car::StartBlinking(veh, 0.5);
 
-	if (ghost->sPlayerName.empty()) SetRacerName(driver, ghost->bIsPersonalBest ? "PERSONAL BEST" : "RACER");
-	else {
-		SetRacerName(driver, ghost->sPlayerName.c_str());
+	if (auto driver = veh->pDriverInfo) {
+		if (ghost->sPlayerName.empty()) SetRacerName(driver, ghost->bIsPersonalBest ? "PERSONAL BEST" : "RACER");
+		else {
+			SetRacerName(driver, ghost->sPlayerName.c_str());
+		}
 	}
 
-	if (!ghost->IsValid()) {
-		Car::StartBlinking(veh, 0.5);
-		return;
-	}
+	if (!ghost->IsValid()) return;
 
 	auto tick = ghost->GetInterpolatedTick(ghost->GetPlaybackTime());
-	if (!tick) return;
+	if (!tick) {
+		ghost->ApplyFinalScore(veh);
+		return;
+	}
 	tick->Apply(veh);
 }
 
@@ -416,7 +438,13 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 	ghost->aTicks.reserve(count);
 	for (int i = 0; i < count; i++) {
 		tReplayTick state = {};
-		inFile.read((char*)&state.v1, sizeof(state.v1));
+		// todo there seems to be padding here, so future updates of replaytick will have to hack around it somehow
+		if (fileVersion >= 3) {
+			inFile.read((char*)&state, sizeof(state));
+		}
+		else {
+			inFile.read((char*)&state.v1, sizeof(state.v1));
+		}
 		ghost->aTicks.push_back(state);
 	}
 }
@@ -426,7 +454,11 @@ void OnChallengeSeriesEventPB();
 void OnFinishRace() {
 	uint32_t replayTime = fGlobalReplayTimerNoCountdown * 1000;
 	uint32_t replayPoints = 0;
-	bool isPointBased = false; // todo drifts
+	bool isPointBased = TheRaceParameters.bDriftRaceFlag;
+	if (isPointBased) {
+		auto score = DriftManager::GetLeaderBoardScore(TheRaceParameters.PlayerDriverNumber[0]);
+		replayPoints = score ? score->fScore : 0;
+	}
 	if (!bViewReplayMode && replayTime > 1000) {
 		auto ghost = &PlayerPBGhost;
 		bool isBetter = !ghost->nFinishTime || replayTime < ghost->nFinishTime;
@@ -535,7 +567,22 @@ tReplayGhost* GetGhostForOpponent(int id) {
 	return &OpponentGhosts[id];
 }
 
-void InvalidatePlayerPos();
+void RunGhosts() {
+	if (bViewReplayMode) {
+		RunGhost(GetLocalPlayerVehicle(), GetViewReplayGhost());
+	}
+	else {
+		// set fixed start points, super ultra hack
+		//if (!bCareerMode && GetLocalPlayerVehicle()->IsStaging() && !OpponentGhosts.empty() && OpponentGhosts[0].IsValid()) {
+		//	InvalidatePlayerPos();
+		//	OpponentGhosts[0].aTicks[0].ApplyPhysics(GetLocalPlayerVehicle());
+		//}
+
+		for (int i = 0; i < GetNumOpponentsInRace(); i++) {
+			RunGhost(GetCarByRacerId(i+1), GetGhostForOpponent(i));
+		}
+	}
+}
 
 void TimeTrialLoop(double delta) {
 	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) {
@@ -611,20 +658,7 @@ void TimeTrialLoop(double delta) {
 		fGlobalReplayTimerNoCountdown = 0;
 	}
 
-	if (bViewReplayMode) {
-		RunGhost(ply, &TheRaceParameters.DriverInfos[0], GetViewReplayGhost());
-	}
-	else {
-		// set fixed start points, super ultra hack
-		//if (!bCareerMode && GetLocalPlayerVehicle()->IsStaging() && !OpponentGhosts.empty() && OpponentGhosts[0].IsValid()) {
-		//	InvalidatePlayerPos();
-		//	OpponentGhosts[0].aTicks[0].ApplyPhysics(GetLocalPlayerVehicle());
-		//}
-
-		for (int i = 0; i < GetNumOpponentsInRace(); i++) {
-			RunGhost(GetCarByRacerId(i+1), &TheRaceParameters.DriverInfos[i+1], GetGhostForOpponent(i));
-		}
-	}
+	RunGhosts();
 
 	RecordGhost(ply);
 	if (!IsPlayerStaging()) {
@@ -699,10 +733,10 @@ void DisplayLeaderboard() {
 				data.SetColor(255, 255, 255, 255);
 			}
 
-			bool isPointBased = false;
+			bool isPointBased = TheRaceParameters.bDriftRaceFlag;
 			std::string str;
 			if (isPointBased) {
-				str = std::format("{}. {} - {}", ranking++, name, ghost.nFinishPoints);
+				str = std::format("{}. {} - {}", ranking++, name, FormatScore(ghost.nFinishPoints));
 			}
 			else {
 				auto time = GetTimeFromMilliseconds(ghost.nFinishTime);
@@ -928,6 +962,24 @@ void DebugMenu() {
 			DrawMenuOption(std::format("IsPlayingEndNIS - {}", CAnimManager::IsPlayingEndNIS(&TheAnimManager)));
 			DrawMenuOption(std::format("GetCountdownNumberToDisplay - {}", Race::GetCountdownNumberToDisplay(pCurrentRace)));
 			DrawMenuOption(std::format("bFinishedRacing - {}", Player::pPlayersByIndex[0]->bFinishedRacing));
+			DrawMenuOption(std::format("GetLocalPlayerVehicle() - {:X}", (uintptr_t)GetLocalPlayerVehicle()));
+			DrawMenuOption(std::format("GetNumOpponentsInRace() - {}", GetNumOpponentsInRace()));
+			for (int i = 0; i < GetNumOpponentsInRace(); i++) {
+				auto car = GetCarByRacerId(i+1);
+				auto ghost = GetGhostForOpponent(i);
+				DrawMenuOption(std::format("opponent[i] - {:X}", (uintptr_t)car));
+				DrawMenuOption(std::format("nMovementMode - {}", (int)car->nMovementMode));
+				DrawMenuOption(std::format("GetRigidBody() - {:X}", (uintptr_t)car->pMover->GetRigidBody()));
+				auto score = DriftManager::GetLeaderBoardScore(car->pDriverInfo->DriverNumber);
+				DrawMenuOption(std::format("score - {:X}", (uintptr_t)score));
+				DrawMenuOption(std::format("fPoints - {}", score ? score->fScore : 0));
+				if (ghost) {
+					DrawMenuOption(std::format("ghost->aTicks.size() - {}", ghost->aTicks.size()));
+					DrawMenuOption(std::format("ghost->nStartTime - {}", ghost->nStartTime));
+					DrawMenuOption(std::format("ghost->nFinishTime - {}", ghost->nFinishTime));
+					DrawMenuOption(std::format("ghost->nFinishPoints - {}", ghost->nFinishPoints));
+				}
+			}
 			ChloeMenuLib::EndMenu();
 		}
 	}

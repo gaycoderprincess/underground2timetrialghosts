@@ -137,6 +137,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4201, "LANCEREVO8_AI_PRESET_1", EVENT_DRAG),
 		ChallengeSeriesEvent(4212, "AL_RX8", EVENT_DRAG),
 		ChallengeSeriesEvent(4121, "JAPANTUNING", EVENT_RACE),
+		ChallengeSeriesEvent(4315, "PresetCar/DDAY_PLAYER_CAR_OLD_FIX", EVENT_DRIFT, 2),
 		ChallengeSeriesEvent(4164, "DEMO_AI_350Z_BROWN", EVENT_RACE),
 		ChallengeSeriesEvent(4601, "THE_DOORS", EVENT_SHORT_TRACK, 3),
 		ChallengeSeriesEvent(4716, "PresetCar/RX7_CUSTOM", EVENT_RACE, 2, true),
@@ -210,14 +211,20 @@ void ChallengeSeriesMenu() {
 
 		auto pb = event.GetPBGhost();
 		auto target = event.GetTargetGhost();
-		auto pbTime = GetTimeFromMilliseconds(pb.nFinishTime);
-		pbTime.pop_back();
-		auto targetTime = GetTimeFromMilliseconds(target.nFinishTime);
-		targetTime.pop_back();
 		//auto optionName = std::format("{} - {}", trackName, carName);
 		auto optionName = trackName;
-		auto description = std::format("Target Time - {} ({})", targetTime, target.sPlayerName);
-		if (pb.nFinishTime != 0) optionName += std::format(" - {}", pbTime);
+		auto description = std::format("Target Time - {} ({})", FormatTime(target.nFinishTime), target.sPlayerName);
+		if (event.nEventType == EVENT_DRIFT) {
+			description = std::format("Target - {} ({})", FormatScore(target.nFinishPoints), target.sPlayerName);
+		}
+		if (pb.nFinishTime != 0) {
+			if (event.nEventType == EVENT_DRIFT) {
+				optionName += std::format(" - {}", FormatScore(pb.nFinishPoints));
+			}
+			else {
+				optionName += std::format(" - {}", FormatTime(pb.nFinishTime));
+			}
+		}
 		if (DrawMenuOption(optionName, description)) {
 			event.SetupEvent();
 			return;

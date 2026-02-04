@@ -80,6 +80,7 @@ class eView;
 int IsCarBlinkingOrPoofedHooked(Car* pCar, eView* view) {
 	auto ply = GetLocalPlayerVehicle();
 	if (pCar == ply) {
+		if (bViewReplayMode) return false;
 		return Car::IsBlinking(pCar) ? nCarBlinkCounter & 1 : 0;
 	}
 
@@ -95,10 +96,16 @@ int IsCarBlinkingOrPoofedHooked(Car* pCar, eView* view) {
 
 class IconOption;
 class IconScrollerMenu;
-static inline auto AddOption_orig = (void(__thiscall*)(IconScrollerMenu*, IconOption*))nullptr;
+auto AddOption_orig = (void(__thiscall*)(IconScrollerMenu*, IconOption*))nullptr;
 void __thiscall AddOptionHooked(IconScrollerMenu* pThis, IconOption* a2) {
 	if (!a2) return;
 	return AddOption_orig(pThis, a2);
+}
+
+auto DriftScoreOverrides_orig = (bool(__thiscall*)(void*))nullptr;
+bool __thiscall DriftScoreOverrides(void* pThis) {
+	RunGhosts();
+	return DriftScoreOverrides_orig(pThis);
 }
 
 BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
@@ -146,6 +153,8 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
 			NyaHookLib::Patch<uint8_t>(0x4AEF40, 0xEB);
 			AddOption_orig = (void(__thiscall*)(IconScrollerMenu*, IconOption*))(*(uintptr_t*)0x797528);
 			NyaHookLib::Patch(0x797528, &AddOptionHooked);
+
+			DriftScoreOverrides_orig = (bool(__thiscall*)(void*))NyaHookLib::PatchRelative(NyaHookLib::CALL, 0x56DE8D, &DriftScoreOverrides);
 
 			NyaHookLib::PatchRelative(NyaHookLib::JMP, 0x60D4F0, &IsCarBlinkingOrPoofedHooked);
 
