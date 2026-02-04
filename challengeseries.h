@@ -68,7 +68,7 @@ void OnChallengeSeriesEventPB() {} // todo pb display
 std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4001, "DDAY_PLAYER_CAR", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4102, "DDAY_PLAYER_CAR_OLD_RX8", EVENT_RACE),
-		ChallengeSeriesEvent(4014, "CAPONE", EVENT_RACE),
+		ChallengeSeriesEvent(4014, "CAPONE", EVENT_RACE, 1),
 };
 
 // 4001 rachel circuit

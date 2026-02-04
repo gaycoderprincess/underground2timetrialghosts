@@ -36,7 +36,7 @@ void MainLoop(float delta) {
 
 void RenderLoop() {
 	UnlockAllThings = true;
-	
+
 	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) bChallengeSeriesMode = false;
 
 	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) {
@@ -121,6 +121,7 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
 
 			NyaHookLib::Patch<uint8_t>(0x5EBD9B, 0xEB); // disable drafting bonus
 			NyaHookLib::Patch<uint8_t>(0x56F7D2, 0xEB); // disable gained position bonus
+			NyaHookLib::Patch<uint8_t>(0x56EFD3, 0xEB); // disable lead lap bonus
 
 			// skip other menu options
 			NyaHookLib::Patch<uint8_t>(0x4AEE64, 0xEB);
