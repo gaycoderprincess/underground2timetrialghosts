@@ -133,16 +133,19 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4141, "SCOTT_TT", EVENT_RACE),
 		ChallengeSeriesEvent(4703, "SHINESTREET", EVENT_RACE, 2, true),
 		ChallengeSeriesEvent(4144, "MARCUS_CELICA", EVENT_RACE),
+		ChallengeSeriesEvent(4304, "PresetCar/SUPRA_CUSTOM", EVENT_DRIFT, 1),
 		ChallengeSeriesEvent(4716, "STOCK_CIVIC", EVENT_RACE, 1),
 		ChallengeSeriesEvent(4201, "LANCEREVO8_AI_PRESET_1", EVENT_DRAG),
 		ChallengeSeriesEvent(4212, "AL_RX8", EVENT_DRAG),
 		ChallengeSeriesEvent(4121, "JAPANTUNING", EVENT_RACE),
 		ChallengeSeriesEvent(4315, "PresetCar/DDAY_PLAYER_CAR_OLD_FIX", EVENT_DRIFT, 2),
 		ChallengeSeriesEvent(4164, "DEMO_AI_350Z_BROWN", EVENT_RACE),
+		ChallengeSeriesEvent(4175, "PresetCar/MUSTANGGT_RAZOR", EVENT_DRIFT),
 		ChallengeSeriesEvent(4601, "THE_DOORS", EVENT_SHORT_TRACK, 3),
 		ChallengeSeriesEvent(4716, "PresetCar/RX7_CUSTOM", EVENT_RACE, 2, true),
 		ChallengeSeriesEvent(4701, "NIGEL_3000GT", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG),
+		ChallengeSeriesEvent(4604, "PresetCar/SKYLINE_CUSTOM", EVENT_DRIFT, 2),
 		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4088, "CALEB_GTO", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4107, "G35_AI_PRESET_1", EVENT_RACE, 1), // marathon
@@ -184,7 +187,13 @@ void ChallengeSeriesMenu() {
 			targetTime = std::format("Target - {} ({})", FormatScore(target.nFinishPoints), target.sPlayerName);
 		}
 		if (pb.nFinishTime != 0) {
-			optionName += std::format(" - {}", event.nEventType == EVENT_DRIFT ? FormatScore(pb.nFinishPoints) : FormatTime(pb.nFinishTime));
+			bool won = pb.nFinishTime <= target.nFinishTime;
+			if (pb.nFinishPoints && target.nFinishPoints) {
+				won = pb.nFinishPoints >= target.nFinishPoints;
+			}
+			if (won) {
+				optionName += std::format(" - Completed");
+			}
 		}
 		if (DrawMenuOption(optionName, targetTime)) {
 			if (sLastSelectedCar != event.sCarPreset && FEngFindScreen("GarageMain.fng")) {
