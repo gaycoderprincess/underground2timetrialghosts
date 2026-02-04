@@ -205,6 +205,8 @@ void InvalidateLocalGhost() {
 
 void RunGhost(Car* veh, DriverInfo* driver, tReplayGhost* ghost) {
 	if (!ghost) return;
+	if (!veh) return;
+	if (!driver) return;
 	ghost->pLastVehicle = veh;
 
 	if (ghost->sPlayerName.empty()) SetRacerName(driver, ghost->bIsPersonalBest ? "PERSONAL BEST" : "RACER");
@@ -244,7 +246,7 @@ void RecordGhost(Car* veh) {
 	aRecordingTicks.push_back(state);
 }
 
-std::string GetGhostFilename(const std::string& car, int track, int lapCount, int opponentId, const char* folder = nullptr) {
+std::string GetGhostFilename(const std::string& car, int track, bool trackReversed, int lapCount, int opponentId, const char* folder = nullptr) {
 	bool doNOSSpdbrkChecks = IsPracticeMode();
 	bool doUpgradeChecks = IsPracticeMode(); // todo
 
@@ -277,7 +279,7 @@ std::string GetGhostFilename(const std::string& car, int track, int lapCount, in
 		}
 	}
 
-	if (TheRaceParameters.TrackDirection == eDIRECTION_BACKWARD) {
+	if (trackReversed) {
 		path += "_rev";
 	}
 
@@ -294,7 +296,7 @@ void SavePB(tReplayGhost* ghost, const std::string& car, int track, int lapCount
 	std::filesystem::create_directory("CwoeeGhosts/ChallengePBs");
 	std::filesystem::create_directory("CwoeeGhosts/Practice");
 
-	auto fileName = GetGhostFilename(car, track, lapCount, 0);
+	auto fileName = GetGhostFilename(car, track, TheRaceParameters.TrackDirection == eDIRECTION_BACKWARD, lapCount, 0);
 	auto outFile = std::ofstream(fileName, std::ios::out | std::ios::binary);
 	if (!outFile.is_open()) {
 		WriteLog("Failed to save " + fileName + "!");
@@ -323,7 +325,7 @@ void SavePB(tReplayGhost* ghost, const std::string& car, int track, int lapCount
 	outFile.write((char*)&ghost->aTicks[0], sizeof(ghost->aTicks[0]) * count);
 }
 
-void LoadPB(tReplayGhost* ghost, const std::string& car, int track, int lapCount, int opponentId, const char* folder = nullptr) {
+void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackReversed, int lapCount, int opponentId, const char* folder = nullptr) {
 	bool doNOSSpdbrkChecks = IsPracticeMode();
 	bool doUpgradeChecks = IsPracticeMode();
 
@@ -331,8 +333,12 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, int lapCount
 	ghost->nFinishTime = 0;
 	ghost->nFinishPoints = 0;
 
-	auto fileName = GetGhostFilename(car, track, lapCount, opponentId, folder);
+	auto fileName = GetGhostFilename(car, track, trackReversed, lapCount, opponentId, folder);
 	auto inFile = std::ifstream(fileName, std::ios::in | std::ios::binary);
+	if (!std::filesystem::exists(fileName)) return;
+	if (!inFile.is_open()) {
+		return;
+	}
 
 	int fileVersion;
 
@@ -435,7 +441,7 @@ void OnFinishRace() {
 	aRecordingTicks.clear();
 }
 
-std::vector<tReplayGhost> CollectReplayGhosts(const std::string& car, int track, int laps, bool forFullLeaderboard = false) {
+std::vector<tReplayGhost> CollectReplayGhosts(const std::string& car, int track, bool trackReversed, int laps, bool forFullLeaderboard = false) {
 	std::vector<tReplayGhost> ghosts;
 
 	auto difficulty = nDifficulty;
@@ -451,7 +457,7 @@ std::vector<tReplayGhost> CollectReplayGhosts(const std::string& car, int track,
 		}
 		for (auto& folder : folders) {
 			tReplayGhost temp;
-			LoadPB(&temp, car, track, laps, 0, folder.c_str());
+			LoadPB(&temp, car, track, trackReversed, laps, 0, folder.c_str());
 			if (!temp.nFinishTime) continue;
 			ghosts.push_back(temp);
 		}
@@ -459,7 +465,7 @@ std::vector<tReplayGhost> CollectReplayGhosts(const std::string& car, int track,
 
 	for (int i = 0; i < nMaxNumGhostsToCheck; i++) {
 		tReplayGhost temp;
-		LoadPB(&temp, car, track, laps, i+1);
+		LoadPB(&temp, car, track, trackReversed, laps, i+1);
 		if (!temp.nFinishTime) continue;
 		ghosts.push_back(temp);
 	}
@@ -480,8 +486,8 @@ std::vector<tReplayGhost> CollectReplayGhosts(const std::string& car, int track,
 	return ghosts;
 }
 
-tReplayGhost SelectTopGhost(const std::string& car, int track, int laps) {
-	auto ghosts = CollectReplayGhosts(car, track, laps);
+tReplayGhost SelectTopGhost(const std::string& car, int track, bool trackReversed, int laps) {
+	auto ghosts = CollectReplayGhosts(car, track, trackReversed, laps);
 	if (ghosts.empty()) return {};
 	return ghosts[0];
 }
@@ -542,23 +548,24 @@ void TimeTrialLoop(double delta) {
 	if (nGhostsLoaded != TheRaceParameters.TrackNumber) {
 		auto car = CarTypeInfoArray[PlayerCarType].CarTypeName;
 		auto track = TheRaceParameters.TrackNumber;
+		auto trackReversed = TheRaceParameters.TrackDirection == eDIRECTION_BACKWARD;
 		auto laps = TheRaceParameters.NumLapsInRace;
-		LoadPB(&PlayerPBGhost, car, track, laps, 0);
+		LoadPB(&PlayerPBGhost, car, track, trackReversed, laps, 0);
 		PlayerPBGhost.bIsPersonalBest = true;
 
 		OpponentGhosts.clear();
 
 		if (bChallengeSeriesMode) {
-			aLeaderboardGhosts = CollectReplayGhosts(car, track, laps, true);
+			aLeaderboardGhosts = CollectReplayGhosts(car, track, trackReversed, laps, true);
 
 			if (bChallengesOneGhostOnly || bViewReplayMode || nDifficulty == DIFFICULTY_EASY) {
-				auto opponent = SelectTopGhost(car, track, laps);
+				auto opponent = SelectTopGhost(car, track, trackReversed, laps);
 				if (opponent.nFinishTime != 0) {
 					OpponentGhosts.push_back(opponent);
 				}
 			}
 			else {
-				auto ghosts = CollectReplayGhosts(car, track, laps);
+				auto ghosts = CollectReplayGhosts(car, track, trackReversed, laps);
 
 				int opponentCount = GetNumOpponentsInRace();
 				for (int i = 0; i < opponentCount && i < ghosts.size(); i++) {
@@ -570,14 +577,14 @@ void TimeTrialLoop(double delta) {
 			int opponentCount = GetNumOpponentsInRace();
 			for (int i = 0; i < opponentCount; i++) {
 				OpponentGhosts.push_back({});
-				LoadPB(&OpponentGhosts[i], car, track, laps, i+1);
+				LoadPB(&OpponentGhosts[i], car, track, trackReversed, laps, i+1);
 			}
 		}
 
 		nGhostsLoaded = TheRaceParameters.TrackNumber;
 	}
 
-	if (Player::pPlayersByIndex[0]->bFinishedRacing) {
+	if (Player::pPlayersByIndex[0]->bFinishedRacing && GetLocalPlayerVehicle() && !Car::IsEngineBlown(GetLocalPlayerVehicle())) {
 		OnFinishRace();
 	}
 
@@ -786,16 +793,16 @@ void DebugMenu() {
 
 	if (DrawMenuOption("Challenge Series")) {
 		ChloeMenuLib::BeginMenu();
-		if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_RACING) {
+		if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) {
+			ChallengeSeriesMenu();
+		}
+		else if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_RACING) {
 			if (DrawMenuOption("Quit Event")) {
 				SkipFE = false;
 				CAnimManager::EndNIS_SafeRemove(&TheAnimManager);
 				cFrontendDatabase::NotifyExitRaceToFrontend(&FEDatabase, false);
 				GameFlowManager::UnloadTrack(&TheGameFlowManager);
 			}
-		}
-		else {
-			ChallengeSeriesMenu();
 		}
 		ChloeMenuLib::EndMenu();
 	}

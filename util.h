@@ -32,17 +32,14 @@ Car* GetNthCar(int n) {
 	return car;
 }
 
-int GetNumCarsInWorld() {
-	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) return 0;
-	return pCurrentWorld->nNumCars;
-}
-
 Car* GetCarByDriverInfo(DriverInfo* driver) {
-	for (int i = 0; i < GetNumCarsInWorld(); i++) {
+	int i = 0;
+	while (true) {
 		auto car = GetNthCar(i);
+		if (!car) return nullptr;
 		if (car->pDriverInfo == driver) return car;
+		i++;
 	}
-	return nullptr;
 }
 
 Car* GetCarByRacerId(int i) {
@@ -67,7 +64,8 @@ bool GetIsGamePaused() {
 }
 
 const char* GetLocalPlayerName() {
-	return TheRaceParameters.DriverInfos[0].sPlayerName;
+	//return TheRaceParameters.DriverInfos[0].sPlayerName;
+	return FEDatabase.sPlayerName;
 }
 
 bool IsPlayerStaging() {
@@ -75,11 +73,14 @@ bool IsPlayerStaging() {
 	return number != 0 && number != 4;
 }
 
-bool IsVehicleValidAndActive(Car* car) {
-	for (int i = 0; i < GetNumCarsInWorld(); i++) {
-		if (GetNthCar(i) == car) return true;
+bool IsVehicleValidAndActive(Car* target) {
+	int i = 0;
+	while (true) {
+		auto car = GetNthCar(i);
+		if (!car) return false;
+		if (car == target) return true;
+		i++;
 	}
-	return false;
 }
 
 bVector3 GetCarPosition(Car* car) {

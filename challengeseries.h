@@ -1,3 +1,14 @@
+std::string GetCarNameForGhost(const std::string& carPreset) {
+	auto car = FindFEPresetCar(FEHashUpper(carPreset.c_str()));
+	std::string carName = car ? car->CarTypeName : carPreset;
+	if (carName.starts_with("STOCK_")) {
+		for (int i = 0; i < 6; i++) {
+			carName.erase(carName.begin());
+		}
+	}
+	return carName;
+}
+
 uint32_t nChallengeSeriesCar = 0;
 class ChallengeSeriesEvent {
 public:
@@ -7,7 +18,12 @@ public:
 	bool bReversed = false;
 	int nLapCountOverride = 0;
 
-	ChallengeSeriesEvent(int trackId, const char* carPreset, eCwoeeEventType eventType, int lapCount = 0) : nTrackNumber(trackId), sCarPreset(carPreset), nEventType(eventType), nLapCountOverride(lapCount) {}
+	std::string sCarNameForGhost;
+	tReplayGhost PBGhost;
+	tReplayGhost aTargetGhosts[NUM_DIFFICULTY] = {};
+	int nNumGhosts[NUM_DIFFICULTY] = {};
+
+	ChallengeSeriesEvent(int trackId, const char* carPreset, eCwoeeEventType eventType, int lapCount = 0, bool reversed = false) : nTrackNumber(trackId), sCarPreset(carPreset), nEventType(eventType), nLapCountOverride(lapCount), bReversed(reversed) {}
 
 	int GetCarID() const {
 		std::string str = sCarPreset;
@@ -28,6 +44,46 @@ public:
 		return -1;
 	}
 
+	int GetNumLaps() const {
+		int laps = nLapCountOverride;
+		if (laps <= 0) {
+			laps = TrackInfo::GetTrackInfo(nTrackNumber)->Point2Point ? 1 : 2;
+		}
+		return laps;
+	}
+
+	void ClearPBGhost() {
+		PBGhost = {};
+	}
+
+	std::string GetCarModelName() const {
+		if (!sCarNameForGhost.empty()) return sCarNameForGhost;
+		return GetCarNameForGhost(sCarPreset);
+	}
+
+	tReplayGhost GetPBGhost() {
+		if (PBGhost.nFinishTime != 0) return PBGhost;
+
+		tReplayGhost temp;
+		LoadPB(&temp, GetCarModelName(), nTrackNumber, bReversed, GetNumLaps(), 0);
+		temp.aTicks.clear(); // just in case
+		PBGhost = temp;
+		return temp;
+	}
+
+	tReplayGhost GetTargetGhost() {
+		if (aTargetGhosts[nDifficulty].nFinishTime != 0) return aTargetGhosts[nDifficulty];
+
+		tReplayGhost targetTime;
+		auto times = CollectReplayGhosts(GetCarModelName(), nTrackNumber, bReversed, GetNumLaps());
+		if (!times.empty()) {
+			times[0].aTicks.clear(); // just in case
+			targetTime = aTargetGhosts[nDifficulty] = times[0];
+		}
+		nNumGhosts[nDifficulty] = times.size();
+		return targetTime;
+	}
+
 	void SetupEvent() const {
 		DoConfigSave();
 
@@ -35,12 +91,17 @@ public:
 		nChallengeSeriesCar = bStringHash(sCarPreset.c_str());
 		ForceAllAICarsToBeThisType = GetCarID();
 
+		// make preset car fully tuned
+		if (auto car = FindFEPresetCar(nChallengeSeriesCar)) {
+			car->PhysicsLevel = 3;
+		}
+
 		SkipFE = true;
 		SkipFETrackNumber = nTrackNumber;
 		SkipFETrackDirection = bReversed;
-		SkipFETrafficDensity = eTRAFFICDENSITY_OFF;
+		SkipFETrafficDensity = nEventType == EVENT_DRAG ? eTRAFFICDENSITY_MEDIUM : eTRAFFICDENSITY_OFF;
 		SkipFERaceType = RACE_TYPE_SINGLE_RACE;
-		SkipFEDragRace = nEventType == EVENT_DRAG;
+		SkipFEDragRace = g_tweakIsDragRace = nEventType == EVENT_DRAG;
 		SkipFEDriftRace = nEventType == EVENT_DRIFT;
 		SkipFEBurnoutRace = nEventType == EVENT_BURNOUT;
 		SkipFEShortTrackRace = nEventType == EVENT_SHORT_TRACK;
@@ -48,12 +109,7 @@ public:
 		SkipFENumPlayerCars = 1;
 		SkipFENumAICars = bChallengesOneGhostOnly ? 1 : 3;
 		SkipFEPlayerCarUpgrades[0] = 3; // full upgrades
-
-		int laps = nLapCountOverride;
-		if (laps <= 0) {
-			laps = SkipFEPoint2Point ? 1 : 2;
-		}
-		SkipFENumLaps = laps;
+		SkipFENumLaps = GetNumLaps();
 
 		OnlineEnabled = false;
 		RaceStarter::StartSkipFERace();
@@ -66,13 +122,29 @@ public:
 void OnChallengeSeriesEventPB() {} // todo pb display
 
 std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
-		ChallengeSeriesEvent(4001, "DDAY_PLAYER_CAR", EVENT_RACE, 2),
-		ChallengeSeriesEvent(4102, "DDAY_PLAYER_CAR_OLD_RX8", EVENT_RACE),
+		ChallengeSeriesEvent(4001, "DDAY_PLAYER_CAR", EVENT_RACE, 2), // rachel circuit
+		ChallengeSeriesEvent(4102, "DDAY_PLAYER_CAR_OLD_RX8", EVENT_RACE), // rachel sprint
 		ChallengeSeriesEvent(4014, "CAPONE", EVENT_RACE, 1),
+		ChallengeSeriesEvent(4022, "D3", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4063, "DEMO_AI_300GT_ORANGE", EVENT_RACE, 1),
+		ChallengeSeriesEvent(4042, "DEMO_PRESET_2", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4086, "DEMO_AI_IMPREZAWRX_BLUE", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4608, "NIKKI_MUSTANGGT", EVENT_SHORT_TRACK, 3),
+		ChallengeSeriesEvent(4141, "SCOTT_TT", EVENT_RACE),
+		ChallengeSeriesEvent(4703, "SHINESTREET", EVENT_RACE, 2, true),
+		ChallengeSeriesEvent(4144, "MARCUS_CELICA", EVENT_RACE),
+		ChallengeSeriesEvent(4716, "STOCK_CIVIC", EVENT_RACE, 1),
+		ChallengeSeriesEvent(4201, "LANCEREVO8_AI_PRESET_1", EVENT_DRAG),
+		ChallengeSeriesEvent(4212, "AL_RX8", EVENT_DRAG),
+		ChallengeSeriesEvent(4121, "JAPANTUNING", EVENT_RACE),
+		ChallengeSeriesEvent(4164, "DEMO_AI_350Z_BROWN", EVENT_RACE),
+		ChallengeSeriesEvent(4601, "THE_DOORS", EVENT_SHORT_TRACK, 3),
+		ChallengeSeriesEvent(4701, "NIGEL_3000GT", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG),
+		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4088, "CALEB_GTO", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4107, "G35_AI_PRESET_1", EVENT_RACE, 1), // marathon
 };
-
-// 4001 rachel circuit
-// 4102 rachel sprint
 
 /*
 350Z_AI_PRESET_1 - 350Z
@@ -110,21 +182,33 @@ TT_AI_PRESET_1 - TT
 */
 
 void ChallengeSeriesMenu() {
+	bChallengeSeriesMode = true;
 	for (auto& event : aNewChallengeSeries) {
-		auto car = FindFEPresetCar(FEHashUpper(event.sCarPreset.c_str()));
-		std::string carName = car ? car->CarTypeName : event.sCarPreset;
-		if (carName.starts_with("STOCK_")) {
-			for (int i = 0; i < 6; i++) {
-				carName.erase(carName.begin());
-			}
-		}
-		carName = GetLocalizedString(FEngHashString(std::format("CAR_NAME_{}", carName).c_str()));
-		auto trackName = GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, event.bReversed));
+		if (event.nEventType == EVENT_DRAG) continue; // drag races start with automatic transmission????
 
-		if (DrawMenuOption(std::format("{} - {}", trackName, carName))) {
+		auto carName = GetLocalizedString(FEngHashString(std::format("CAR_NAME_{}", event.GetCarModelName()).c_str()));
+		auto trackName = (std::string)GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, event.bReversed));
+		if (trackName.starts_with("Bayview Speedway Track ")) {
+			trackName.erase(trackName.begin(), trackName.begin() + 23);
+			trackName = "Bayview Speedway " + trackName;
+		}
+
+		auto pb = event.GetPBGhost();
+		auto target = event.GetTargetGhost();
+		auto pbTime = GetTimeFromMilliseconds(pb.nFinishTime);
+		pbTime.pop_back();
+		auto targetTime = GetTimeFromMilliseconds(target.nFinishTime);
+		targetTime.pop_back();
+		//auto optionName = std::format("{} - {}", trackName, carName);
+		auto optionName = trackName;
+		auto description = std::format("Target Time - {} ({})", targetTime,  target.sPlayerName);
+		if (pb.nFinishTime != 0) optionName += std::format(" - {}", pbTime);
+		if (DrawMenuOption(optionName, description)) {
 			event.SetupEvent();
+			return;
 		}
 	}
+	bChallengeSeriesMode = false;
 }
 
 void __thiscall RideInfoInitHooked(RideInfo* pThis, int a1, int a2, int a3, int a4) {
