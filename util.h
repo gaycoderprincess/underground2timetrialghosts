@@ -64,8 +64,7 @@ bool GetIsGamePaused() {
 }
 
 const char* GetLocalPlayerName() {
-	//return TheRaceParameters.DriverInfos[0].sPlayerName;
-	return FEDatabase.sPlayerName;
+	return FEDatabase.CurrentUserProfiles[0].m_aProfileName;
 }
 
 bool IsPlayerStaging() {

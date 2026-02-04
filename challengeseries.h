@@ -119,8 +119,6 @@ public:
 	}
 };
 
-void OnChallengeSeriesEventPB() {} // todo pb display
-
 std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4001, "DDAY_PLAYER_CAR", EVENT_RACE, 2), // rachel circuit
 		ChallengeSeriesEvent(4102, "DDAY_PLAYER_CAR_OLD_RX8", EVENT_RACE), // rachel sprint
@@ -145,6 +143,19 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4088, "CALEB_GTO", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4107, "G35_AI_PRESET_1", EVENT_RACE, 1), // marathon
 };
+
+ChallengeSeriesEvent* GetChallengeEvent(int id) {
+	for (auto& event : aNewChallengeSeries) {
+		if (event.nTrackNumber == id) return &event;
+	}
+	return nullptr;
+}
+
+void OnChallengeSeriesEventPB() {
+	auto event = GetChallengeEvent(TheRaceParameters.TrackNumber);
+	if (!event) return;
+	event->ClearPBGhost();
+}
 
 /*
 350Z_AI_PRESET_1 - 350Z
@@ -201,7 +212,7 @@ void ChallengeSeriesMenu() {
 		targetTime.pop_back();
 		//auto optionName = std::format("{} - {}", trackName, carName);
 		auto optionName = trackName;
-		auto description = std::format("Target Time - {} ({})", targetTime,  target.sPlayerName);
+		auto description = std::format("Target Time - {} ({})", targetTime, target.sPlayerName);
 		if (pb.nFinishTime != 0) optionName += std::format(" - {}", pbTime);
 		if (DrawMenuOption(optionName, description)) {
 			event.SetupEvent();

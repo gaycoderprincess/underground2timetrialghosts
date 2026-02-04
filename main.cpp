@@ -37,7 +37,13 @@ void MainLoop(float delta) {
 void RenderLoop() {
 	UnlockAllThings = true;
 
-	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) bChallengeSeriesMode = false;
+	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) {
+		if (bChallengeSeriesMode) {
+			SkipFE = false;
+			ForceAllAICarsToBeThisType = -1;
+		}
+		bChallengeSeriesMode = false;
+	}
 
 	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) {
 		InvalidateGhost();
