@@ -35,7 +35,7 @@ public:
 			}
 		}
 		else {
-			if (auto preset = FindFEPresetCar(nChallengeSeriesCar)) {
+			if (auto preset = FindFEPresetCar(bStringHash(sCarPreset.c_str()))) {
 				str = preset->CarTypeName;
 			}
 		}
@@ -91,7 +91,7 @@ public:
 
 		bChallengeSeriesMode = true;
 		nChallengeSeriesCar = bStringHash(sCarPreset.c_str());
-		ForceAllAICarsToBeThisType = GetCarID();
+		ForceAllAICarsToBeThisType = CarTypeInfoArray[GetCarID()].Type;
 
 		// make preset car fully tuned
 		if (auto car = FindFEPresetCar(nChallengeSeriesCar)) {
@@ -161,47 +161,13 @@ void OnChallengeSeriesEventPB() {
 	event->ClearPBGhost();
 }
 
-/*
-350Z_AI_PRESET_1 - 350Z
-AL_RX8 - RX8
-CALEB_GTO - GTO
-CAPONE - HUMMER
-CHINGY - NAVIGATOR
-D3 - ECLIPSE
-DAVIDCHOE - COROLLA
-DDAY_PLAYER_CAR - 350Z
-DDAY_PLAYER_CAR_OLD - LANCEREVO8
-DDAY_PLAYER_CAR_OLD_RX8 - RX8
-DEMO_AI_300GT_BLUE - 3000GT
-DEMO_AI_300GT_ORANGE - 3000GT
-DEMO_AI_350Z_BROWN - 350Z
-DEMO_AI_350Z_SILVER - 350Z
-DEMO_AI_IMPREZAWRX_BLUE - IMPREZAWRX
-DEMO_AI_IMPREZAWRX_WHITE - IMPREZAWRX
-DEMO_PRESET_1 - 350Z
-DEMO_PRESET_2 - 350Z
-DEMO_PRESET_3 - 350Z
-DEMO_PRESET_4 - 350Z
-G35_AI_PRESET_1 - G35
-JAPANTUNING - G35
-LANCEREVO8_AI_PRESET_1 - LANCEREVO8
-MARCUS_CELICA - CELICA
-NIGEL_3000GT - 3000GT
-NIKKI_MUSTANGGT - MUSTANGGT
-SCOTT_TT - TT
-SHINESTREET - IS300
-SNOOP_DOGG - ESCALADE
-THE_DOORS - GTO
-TOM_G35 - G35
-TT_AI_PRESET_1 - TT
-*/
-
 void ChallengeSeriesMenu() {
+	static std::string sLastSelectedCar;
+
 	bChallengeSeriesMode = true;
 	for (auto& event : aNewChallengeSeries) {
 		if (event.nEventType == EVENT_DRAG) continue; // drag races start with automatic transmission????
 
-		auto carName = GetLocalizedString(FEngHashString(std::format("CAR_NAME_{}", event.GetCarModelName()).c_str()));
 		auto trackName = (std::string)GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, false));
 		if (event.bReversed) trackName += " Reversed";
 		if (trackName.starts_with("Bayview Speedway Track ")) {
@@ -213,21 +179,48 @@ void ChallengeSeriesMenu() {
 		auto target = event.GetTargetGhost();
 		//auto optionName = std::format("{} - {}", trackName, carName);
 		auto optionName = trackName;
-		auto description = std::format("Target Time - {} ({})", FormatTime(target.nFinishTime), target.sPlayerName);
+		auto targetTime = std::format("Target Time - {} ({})", FormatTime(target.nFinishTime), target.sPlayerName);
 		if (event.nEventType == EVENT_DRIFT) {
-			description = std::format("Target - {} ({})", FormatScore(target.nFinishPoints), target.sPlayerName);
+			targetTime = std::format("Target - {} ({})", FormatScore(target.nFinishPoints), target.sPlayerName);
 		}
 		if (pb.nFinishTime != 0) {
-			if (event.nEventType == EVENT_DRIFT) {
-				optionName += std::format(" - {}", FormatScore(pb.nFinishPoints));
-			}
-			else {
-				optionName += std::format(" - {}", FormatTime(pb.nFinishTime));
-			}
+			optionName += std::format(" - {}", event.nEventType == EVENT_DRIFT ? FormatScore(pb.nFinishPoints) : FormatTime(pb.nFinishTime));
 		}
-		if (DrawMenuOption(optionName, description)) {
-			event.SetupEvent();
-			return;
+		if (DrawMenuOption(optionName, targetTime)) {
+			if (sLastSelectedCar != event.sCarPreset && FEngFindScreen("GarageMain.fng")) {
+				if (event.sCarPreset.starts_with("STOCK_")) {
+					RideInfo::Init(&TopOrFullScreenRide, event.GetCarID(), 1, 0, 0);
+					RideInfo::SetCompositeNameHash(&TopOrFullScreenRide, 1);
+					RideInfo::SetStockParts(&TopOrFullScreenRide, 0);
+					GarageMainScreen::SetRideInfo((GarageMainScreen*)FEngFindScreen("GarageMain.fng"), &TopOrFullScreenRide, SET_RIDE_INFO_REASON_CATCHALL);
+				}
+				else {
+					RideInfo::FillWithPreset(&TopOrFullScreenRide, bStringHash(event.sCarPreset.c_str()));
+					GarageMainScreen::SetRideInfo((GarageMainScreen*)FEngFindScreen("GarageMain.fng"), &TopOrFullScreenRide, SET_RIDE_INFO_REASON_CATCHALL);
+				}
+			}
+			sLastSelectedCar = event.sCarPreset;
+
+			std::string carName = CarTypeInfoArray[event.GetCarID()].ManufacturerName;
+			std::transform(carName.begin(), carName.end(), carName.begin(), [](char c){ return std::tolower(c); });
+			carName[0] = std::toupper(carName[0]);
+
+			carName += " ";
+			if (!strcmp(CarTypeInfoArray[event.GetCarID()].CarTypeName, "HUMMER")) carName.clear(); // doubled brand name
+			carName += GetLocalizedString(FEngHashString(std::format("CAR_NAME_{}", event.GetCarModelName()).c_str()));
+
+			ChloeMenuLib::BeginMenu();
+			DrawMenuOption(std::format("Track - {}", trackName));
+			DrawMenuOption(std::format("Car - {}", carName));
+			DrawMenuOption(targetTime);
+			if (pb.nFinishTime != 0) {
+				DrawMenuOption(std::format("Personal Best - {}", event.nEventType == EVENT_DRIFT ? FormatScore(pb.nFinishPoints) : FormatTime(pb.nFinishTime)));
+			}
+			if (DrawMenuOption("Launch Event")) {
+				event.SetupEvent();
+				return;
+			}
+			ChloeMenuLib::EndMenu();
 		}
 	}
 	bChallengeSeriesMode = false;
