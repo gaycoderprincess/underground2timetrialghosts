@@ -236,6 +236,8 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
 			NyaHookLib::PatchRelative(NyaHookLib::JMP, 0x40A23B, &SetMovementModeHooked);
 			NyaHookLib::PatchRelative(NyaHookLib::JMP, 0x40A274, &SetMovementModeHooked);
 			NyaHookLib::PatchRelative(NyaHookLib::JMP, 0x5F499C, &SetMovementModeHooked);
+
+			WriteLog("Mod initialized");
 		} break;
 		default:
 			break;

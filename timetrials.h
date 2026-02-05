@@ -650,7 +650,7 @@ void TimeTrialLoop(double delta) {
 		nGhostsLoaded = TheRaceParameters.TrackNumber;
 	}
 
-	if (Player::pPlayersByIndex[0]->bFinishedRacing && GetLocalPlayerVehicle() && !Car::IsEngineBlown(GetLocalPlayerVehicle())) {
+	if (Player::pPlayersByIndex[0]->bFinishedRacing && ply && !Car::IsEngineBlown(ply) && !ply->bIsTotaled) {
 		OnFinishRace();
 	}
 

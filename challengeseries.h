@@ -133,10 +133,10 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4012, "PresetCar/MIATA_CINGULAR", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4141, "SCOTT_TT", EVENT_RACE),
 		ChallengeSeriesEvent(4703, "SHINESTREET", EVENT_RACE, 2, true),
+		ChallengeSeriesEvent(4201, "LANCEREVO8_AI_PRESET_1", EVENT_DRAG),
 		ChallengeSeriesEvent(4144, "MARCUS_CELICA", EVENT_RACE),
 		ChallengeSeriesEvent(4304, "PresetCar/SUPRA_CUSTOM", EVENT_DRIFT, 1),
 		ChallengeSeriesEvent(4716, "STOCK_CIVIC", EVENT_RACE, 1),
-		ChallengeSeriesEvent(4201, "LANCEREVO8_AI_PRESET_1", EVENT_DRAG),
 		ChallengeSeriesEvent(4212, "AL_RX8", EVENT_DRAG),
 		ChallengeSeriesEvent(4121, "JAPANTUNING", EVENT_RACE),
 		ChallengeSeriesEvent(4315, "PresetCar/DDAY_PLAYER_CAR_OLD_FIX", EVENT_DRIFT, 2),
@@ -171,8 +171,6 @@ void ChallengeSeriesMenu() {
 
 	bChallengeSeriesMode = true;
 	for (auto& event : aNewChallengeSeries) {
-		if (event.nEventType == EVENT_DRAG) continue; // drag races are marked as finished if you're totaled and afaik there's no way to check
-
 		auto trackName = (std::string)GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, false));
 		if (event.bReversed) trackName += " Reversed";
 		if (trackName.starts_with("Bayview Speedway Track ")) {
