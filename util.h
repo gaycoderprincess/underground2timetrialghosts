@@ -38,6 +38,7 @@ Car* GetCarByDriverInfo(DriverInfo* driver) {
 		auto car = GetNthCar(i);
 		if (!car) return nullptr;
 		if (car->pDriverInfo == driver) return car;
+		if (i >= 256) return nullptr;
 		i++;
 	}
 }
@@ -78,6 +79,7 @@ bool IsVehicleValidAndActive(Car* target) {
 		auto car = GetNthCar(i);
 		if (!car) return false;
 		if (car == target) return true;
+		if (i >= 256) return false;
 		i++;
 	}
 }

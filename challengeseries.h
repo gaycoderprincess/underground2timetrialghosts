@@ -144,7 +144,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4175, "PresetCar/MUSTANGGT_RAZOR", EVENT_DRIFT),
 		ChallengeSeriesEvent(4601, "THE_DOORS", EVENT_SHORT_TRACK, 3),
 		ChallengeSeriesEvent(4716, "PresetCar/RX7_CUSTOM", EVENT_RACE, 2, true),
-		ChallengeSeriesEvent(4701, "NIGEL_3000GT", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4701, "PresetCar/3000GT_CUSTOM", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG),
 		ChallengeSeriesEvent(4604, "PresetCar/SKYLINE_CUSTOM", EVENT_DRIFT, 2),
 		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
@@ -197,7 +197,8 @@ void ChallengeSeriesMenu() {
 			}
 		}
 		if (DrawMenuOption(optionName, targetTime)) {
-			if (sLastSelectedCar != event.sCarPreset && FEngFindScreen("GarageMain.fng")) {
+			// unstable
+			/*if (sLastSelectedCar != event.sCarPreset && FEngFindScreen("GarageMain.fng")) {
 				if (event.sCarPreset.starts_with("STOCK_")) {
 					RideInfo::Init(&TopOrFullScreenRide, event.GetCarID(), 1, 0, 0);
 					RideInfo::SetCompositeNameHash(&TopOrFullScreenRide, 1);
@@ -208,7 +209,7 @@ void ChallengeSeriesMenu() {
 					RideInfo::FillWithPreset(&TopOrFullScreenRide, bStringHash(event.sCarPreset.c_str()));
 					GarageMainScreen::SetRideInfo((GarageMainScreen*)FEngFindScreen("GarageMain.fng"), &TopOrFullScreenRide, SET_RIDE_INFO_REASON_CATCHALL);
 				}
-			}
+			}*/
 			sLastSelectedCar = event.sCarPreset;
 
 			std::string carName = CarTypeInfoArray[event.GetCarID()].ManufacturerName;
