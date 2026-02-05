@@ -598,6 +598,11 @@ void TimeTrialLoop(double delta) {
 		return;
 	}
 
+	// force manual transmission for drag races - fixes skipfe
+	if (TheRaceParameters.bDragRaceFlag && Player::pPlayersByIndex[0]) {
+		Player::pPlayersByIndex[0]->bManualTransmission = true;
+	}
+
 	if (IsInLoadingScreen()) {
 		InvalidateLocalGhost();
 		return;
@@ -650,6 +655,10 @@ void TimeTrialLoop(double delta) {
 	}
 
 	if (!ShouldGhostRun()) return;
+
+	if (IsPracticeMode()) {
+		TheRaceParameters.TrafficDensity = TheRaceParameters.bDragRaceFlag ? eTRAFFICDENSITY_MEDIUM : eTRAFFICDENSITY_OFF;
+	}
 
 	//auto opponents = VEHICLE_LIST::GetList(VEHICLE_AIRACERS);
 	//for (int i = 0; i < opponents.size(); i++) {

@@ -145,7 +145,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4601, "THE_DOORS", EVENT_SHORT_TRACK, 3),
 		ChallengeSeriesEvent(4716, "PresetCar/RX7_CUSTOM", EVENT_RACE, 2, true),
 		ChallengeSeriesEvent(4701, "PresetCar/3000GT_CUSTOM", EVENT_RACE, 2),
-		ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG),
+		//ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG), // airport drag is super boring
 		ChallengeSeriesEvent(4604, "PresetCar/SKYLINE_CUSTOM", EVENT_DRIFT, 2),
 		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4024, "PresetCar/240SX_CUSTOM", EVENT_RACE, 2),
@@ -171,7 +171,7 @@ void ChallengeSeriesMenu() {
 
 	bChallengeSeriesMode = true;
 	for (auto& event : aNewChallengeSeries) {
-		if (event.nEventType == EVENT_DRAG) continue; // drag races start with automatic transmission????
+		if (event.nEventType == EVENT_DRAG) continue; // drag races are marked as finished if you're totaled and afaik there's no way to check
 
 		auto trackName = (std::string)GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, false));
 		if (event.bReversed) trackName += " Reversed";
