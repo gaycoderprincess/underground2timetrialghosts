@@ -688,7 +688,7 @@ void DisplayLeaderboard() {
 	if (IsPracticeMode()) return;
 	if (MovieIsStarted) return;
 
-	if (IsPlayerStaging() || World::IsWorldPaused(pCurrentWorld)) {
+	if (IsPlayerStaging() || GetIsGamePaused()) {
 		std::vector<std::string> uniquePlayers;
 
 		auto leaderboard = aLeaderboardGhosts;
@@ -758,8 +758,7 @@ void DisplayLeaderboard() {
 }
 
 void DisplayPlayerNames() {
-	// todo
-	/*if (bChallengeSeriesMode && nGhostVisuals != GHOST_HIDE && !GetIsGamePaused()) {
+	if (bChallengeSeriesMode && nGhostVisuals != GHOST_HIDE && !GetIsGamePaused()) {
 		const float fPlayerNameOffset = 0.031;
 		const float fPlayerNameSize = 0.022;
 		const float fPlayerNameFadeStart = 50.0;
@@ -776,44 +775,43 @@ void DisplayPlayerNames() {
 
 			auto name = ghost->bIsPersonalBest ? ghost->sPlayerName : GetRealPlayerName(ghost->sPlayerName);
 
-			float carHeight = 1.5;
+			float carHeight = 1.0;
 			//UMath::Vector3 dim;
 			//car->mCOMObject->Find<IRigidBody>()->GetDimension(&dim);
 
 			auto pos = GetCarPosition(car);
-			pos.y += carHeight;
+			pos.z += carHeight;
 
-			auto cam = PrepareCameraMatrix(GetLocalPlayerCamera());
-			auto camFwd = RenderToWorldCoords(cam.z);
-			auto camPos = RenderToWorldCoords(cam.p);
-			auto playerDir = camPos - pos;
-			auto cameraDist = playerDir.length();
-			playerDir.Normalize();
-			if (playerDir.Dot(camFwd) > 0) continue;
-			if (cameraDist > fPlayerNameFadeEnd) continue;
+			//auto cam = PrepareCameraMatrix(GetLocalPlayerCamera());
+			//auto camFwd = RenderToWorldCoords(cam.z);
+			//auto camPos = RenderToWorldCoords(cam.p);
+			//auto playerDir = camPos - pos;
+			//auto cameraDist = playerDir.length();
+			//playerDir.Normalize();
+			//if (playerDir.Dot(camFwd) > 0) continue;
+			//if (cameraDist > fPlayerNameFadeEnd) continue;
 
 			bVector3 screenPos;
-			auto worldPos = WorldToRenderCoords(pos);
-			eViewPlatInterface::GetScreenPosition(&eViews[EVIEW_PLAYER1], &screenPos, (bVector3*)&worldPos);
+			eViewPlatInterface::GetScreenPosition(&eViews[EVIEW_PLAYER1], &screenPos, &pos);
 
 			screenPos.x /= (double)nResX;
 			screenPos.y /= (double)nResY;
-			//if (screenPos.z <= 0) continue;
+			if (screenPos.z >= 1.0) continue;
 
 			tNyaStringData data;
 			data.x = screenPos.x;
 			data.y = screenPos.y - fPlayerNameOffset;
 			data.size = fPlayerNameSize;
 			data.XCenterAlign = true;
-			if (cameraDist > fPlayerNameFadeStart) {
-				data.a = std::lerp(fPlayerNameAlpha, 0, (cameraDist - fPlayerNameFadeStart) / (fPlayerNameFadeEnd - fPlayerNameFadeStart));
-			}
-			else {
+			//if (cameraDist > fPlayerNameFadeStart) {
+			//	data.a = std::lerp(fPlayerNameAlpha, 0, (cameraDist - fPlayerNameFadeStart) / (fPlayerNameFadeEnd - fPlayerNameFadeStart));
+			//}
+			//else {
 				data.a = fPlayerNameAlpha;
-			}
+			//}
 			DrawString(data, name);
 		}
-	}*/
+	}
 }
 
 void TimeTrialRenderLoop() {
