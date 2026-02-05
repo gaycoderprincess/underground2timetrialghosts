@@ -182,11 +182,12 @@ void ChallengeSeriesMenu() {
 
 		auto pb = event.GetPBGhost();
 		auto target = event.GetTargetGhost();
+		auto targetName = GetRealPlayerName(target.sPlayerName);
 		//auto optionName = std::format("{} - {}", trackName, carName);
 		auto optionName = trackName;
-		auto targetTime = std::format("Target Time - {} ({})", FormatTime(target.nFinishTime), target.sPlayerName);
+		auto targetTime = std::format("Target Time - {} ({})", FormatTime(target.nFinishTime), targetName);
 		if (event.nEventType == EVENT_DRIFT) {
-			targetTime = std::format("Target - {} ({})", FormatScore(target.nFinishPoints), target.sPlayerName);
+			targetTime = std::format("Target - {} ({})", FormatScore(target.nFinishPoints), targetName);
 		}
 		if (pb.nFinishTime != 0) {
 			bool won = pb.nFinishTime <= target.nFinishTime;

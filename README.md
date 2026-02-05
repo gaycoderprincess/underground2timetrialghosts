@@ -7,6 +7,7 @@ A mod for Need for Speed: Underground 2 that replaces Quick Race opponents with 
 - Make sure you have v1.2 of the game, as this is the only version this plugin is compatible with. (exe size of 4800512 bytes)
 - Plop the files into your game folder.
 - Start the game and launch any race, you will now have a ghost to race against instead of AI opponents.
+- Press F5 to open the mod's menu and play the included Challenge Series.
 - Enjoy, nya~ :3
 
 ## Building

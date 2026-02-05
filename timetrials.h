@@ -423,7 +423,9 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 		if (!strcmp(tmpplayername, "woof")) strcpy_s(tmpplayername, "Chloe");
 	}
 	if (folder) {
-		strcpy_s(tmpplayername, folder);
+		for (int i = 0; i < strlen(folder) && i < nPlayerNameLength; i++) {
+			tmpplayername[i] = folder[i];
+		}
 	}
 	tmpplayername[nPlayerNameLength-1] = 0;
 	ghost->sPlayerName = tmpplayername;
