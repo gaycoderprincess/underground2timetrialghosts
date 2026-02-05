@@ -148,6 +148,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG),
 		ChallengeSeriesEvent(4604, "PresetCar/SKYLINE_CUSTOM", EVENT_DRIFT, 2),
 		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4024, "PresetCar/240SX_CUSTOM", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4088, "CALEB_GTO", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4107, "G35_AI_PRESET_1", EVENT_RACE, 1), // marathon
 };
