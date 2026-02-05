@@ -56,6 +56,14 @@ Car* GetLocalPlayerVehicle() {
 	return GetCarByRacerId(0);
 }
 
+CarDriver* GetLocalPlayerDriver() {
+	auto veh = GetLocalPlayerVehicle();
+	if (!veh) return nullptr;
+	auto controller = veh->pController;
+	if (!controller) return nullptr;
+	return controller->pDriver;
+}
+
 void SetRacerName(DriverInfo* racer, const char* name) {
 	strcpy_s(racer->sPlayerName, 16, name);
 }

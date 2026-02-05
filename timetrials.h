@@ -1,4 +1,4 @@
-const int nLocalReplayVersion = 3;
+const int nLocalReplayVersion = 4;
 const int nMaxNumGhostsToCheck = 16;
 const int nPlayerNameLength = 16;
 const int nMinGhostTicks = 30;
@@ -20,6 +20,7 @@ enum eGhostVisuals {
 	NUM_GHOST_VISUALS
 };
 int nGhostVisuals = GHOST_SHOW;
+bool bShowInputsWhileDriving = false;
 char sPlayerNameOverride[nPlayerNameLength] = "";
 enum eDifficulty {
 	DIFFICULTY_EASY, // slowest ghost only for every track
@@ -45,6 +46,7 @@ void DoConfigSave() {
 	file.write((char*)&bPracticeOpponentsOnly, sizeof(bPracticeOpponentsOnly));
 	file.write((char*)&nNitroType, sizeof(nNitroType));
 	file.write((char*)&bCheckFileIntegrity, sizeof(bCheckFileIntegrity));
+	file.write((char*)&bShowInputsWhileDriving, sizeof(bShowInputsWhileDriving));
 }
 
 void DoConfigLoad() {
@@ -60,6 +62,7 @@ void DoConfigLoad() {
 	file.read((char*)&bPracticeOpponentsOnly, sizeof(bPracticeOpponentsOnly));
 	file.read((char*)&nNitroType, sizeof(nNitroType));
 	file.read((char*)&bCheckFileIntegrity, sizeof(bCheckFileIntegrity));
+	file.read((char*)&bShowInputsWhileDriving, sizeof(bShowInputsWhileDriving));
 }
 
 bool IsPracticeMode() {
@@ -74,9 +77,18 @@ struct tReplayTick {
 		RigidBodyState state;
 		double timer;
 	} v1;
-	struct tTickVersion2 {
+	struct tTickVersion3 {
 		int points;
-	} v2;
+	} v3;
+	struct tTickVersion4 {
+		float fNitroCharge;
+		float fThrottle;
+		float fEBrake;
+		float fBrake;
+		uint8_t bNOS;
+		uint8_t pad;
+		int16_t nSteering;
+	} v4;
 
 	void Collect(Car* pVehicle) {
 		if (pVehicle->nMovementMode != PHYSICS_MOVEMENT) {
@@ -92,11 +104,21 @@ struct tReplayTick {
 		v1.state = rb->State;
 		v1.timer = fGlobalReplayTimer;
 
-		v2.points = 0;
+		v3.points = 0;
 		if (TheRaceParameters.bDriftRaceFlag) {
 			auto score = DriftManager::GetLeaderBoardScore(pVehicle->pDriverInfo->DriverNumber);
-			v2.points = score ? score->fScore : 0;
+			v3.points = score ? score->fScore : 0;
 		}
+
+		auto controller = pVehicle->pController;
+		if (controller && controller->pDriver) {
+			v4.nSteering = controller->pDriver->nSteering;
+			v4.fThrottle = controller->pDriver->fThrottle;
+			v4.fBrake = controller->pDriver->fBrake;
+			v4.fEBrake = controller->pDriver->fEBrake;
+		}
+		v4.bNOS = CarState::IsNitrousOn(&pVehicle->State);
+		v4.fNitroCharge = pVehicle->State.fNitrous;
 	}
 
 	void Apply(Car* pVehicle) {
@@ -111,8 +133,25 @@ struct tReplayTick {
 
 		if (TheRaceParameters.bDriftRaceFlag) {
 			auto score = DriftManager::GetLeaderBoardScore(pVehicle->pDriverInfo->DriverNumber);
-			if (score) score->fScore = v2.points;
+			if (score) score->fScore = v3.points;
 		}
+
+		auto controller = pVehicle->pController;
+		if (controller && controller->pDriver) {
+			controller->pDriver->nSteering = v4.nSteering;
+			controller->pDriver->fThrottle = v4.fThrottle;
+			controller->pDriver->fBrake = v4.fBrake;
+			controller->pDriver->fEBrake = v4.fEBrake;
+		}
+		if (CarState::IsNitrousOn(&pVehicle->State) != v4.bNOS) {
+			if (v4.bNOS) {
+				CarState::StartNitrous(&pVehicle->State);
+			}
+			else {
+				CarState::StopNitrous(&pVehicle->State);
+			}
+		}
+		pVehicle->State.fNitrous = v4.fNitroCharge;
 	}
 };
 
@@ -253,17 +292,16 @@ void RunGhost(Car* veh, tReplayGhost* ghost) {
 }
 
 void RecordGhost(Car* veh) {
-	// todo
-	//if (!bChallengeSeriesMode) {
-	//	switch (nNitroType) {
-	//		case NITRO_OFF:
-	//			veh->mCOMObject->Find<IEngine>()->ChargeNOS(-1);
-	//			break;
-	//		case NITRO_INF:
-	//			veh->mCOMObject->Find<IEngine>()->ChargeNOS(1);
-	//			break;
-	//	}
-	//}
+	if (!bChallengeSeriesMode) {
+		switch (nNitroType) {
+			case NITRO_OFF:
+				veh->State.fNitrous = 0;
+				break;
+			case NITRO_INF:
+				veh->State.fNitrous = 9999;
+				break;
+		}
+	}
 
 	if (sPlayerNameOverride[0]) {
 		SetRacerName(veh->pDriverInfo, sPlayerNameOverride);
@@ -440,12 +478,17 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 	ghost->aTicks.reserve(count);
 	for (int i = 0; i < count; i++) {
 		tReplayTick state = {};
-		// todo there seems to be padding here, so future updates of replaytick will have to hack around it somehow
+		inFile.read((char*)&state.v1, sizeof(state.v1));
 		if (fileVersion >= 3) {
-			inFile.read((char*)&state, sizeof(state));
+			inFile.read((char*)&state.v3, sizeof(state.v3));
+			// padding added by the compiler, apparently
+			if (fileVersion < 4) {
+				int tmp = 0;
+				inFile.read((char*)&tmp, sizeof(tmp));
+			}
 		}
-		else {
-			inFile.read((char*)&state.v1, sizeof(state.v1));
+		if (fileVersion >= 4) {
+			inFile.read((char*)&state.v4, sizeof(state.v4));
 		}
 		ghost->aTicks.push_back(state);
 	}
@@ -650,7 +693,7 @@ void TimeTrialLoop(double delta) {
 		nGhostsLoaded = TheRaceParameters.TrackNumber;
 	}
 
-	if (Player::pPlayersByIndex[0]->bFinishedRacing && ply && !Car::IsEngineBlown(ply) && !ply->bIsTotaled) {
+	if (Player::pPlayersByIndex[0]->bFinishedRacing && (!TheRaceParameters.bDragRaceFlag || (ply && !Car::IsEngineBlown(ply) && !ply->bIsTotaled))) {
 		OnFinishRace();
 	}
 
@@ -676,6 +719,52 @@ void TimeTrialLoop(double delta) {
 		fGlobalReplayTimerNoCountdown += delta;
 	}
 	fGlobalReplayTimer += delta;
+}
+
+auto gInputRGBBackground = NyaDrawing::CNyaRGBA32(215,215,215,255);
+auto gInputRGBHighlight = NyaDrawing::CNyaRGBA32(0,255,0,255);
+float fInputBaseXPosition = 0.45;
+float fInputBaseYPosition = 0.85;
+
+void DrawInputTriangle(float posX, float posY, float sizeX, float sizeY, float inputValue, bool invertValue) {
+	float minX = std::min(posX - sizeX, posX);
+	float maxX = std::max(posX - sizeX, posX);
+
+	DrawTriangle(posX, posY - sizeY, posX - sizeX, std::lerp(posY - sizeY, posY + sizeY, 0.5), posX,
+				 posY + sizeY, invertValue ? gInputRGBBackground : gInputRGBHighlight);
+
+	DrawTriangle(posX, posY - sizeY, posX - sizeX, std::lerp(posY - sizeY, posY + sizeY, 0.5), posX,
+				 posY + sizeY, invertValue ? gInputRGBHighlight : gInputRGBBackground, std::lerp(minX, maxX, inputValue), 0, 1, 1);
+}
+
+void DrawInputTriangleY(float posX, float posY, float sizeX, float sizeY, float inputValue, bool invertValue) {
+	float minY = std::min(posY - sizeY, posY + sizeY);
+	float maxY = std::max(posY - sizeY, posY + sizeY);
+
+	DrawTriangle(std::lerp(posX - sizeX, posX + sizeX, 0.5), posY - sizeY, posX - sizeX, posY + sizeY, posX + sizeX,
+				 posY + sizeY, invertValue ? gInputRGBBackground : gInputRGBHighlight);
+
+	DrawTriangle(std::lerp(posX - sizeX, posX + sizeX, 0.5), posY - sizeY, posX - sizeX, posY + sizeY, posX + sizeX,
+				 posY + sizeY, invertValue ? gInputRGBHighlight : gInputRGBBackground, 0, std::lerp(minY, maxY + 0.001, inputValue), 1, 1);
+}
+
+void DrawInputRectangle(float posX, float posY, float scaleX, float scaleY, float inputValue) {
+	DrawRectangle(posX - scaleX, posX + scaleX, posY - scaleY, posY + scaleY, gInputRGBBackground);
+	DrawRectangle(posX - scaleX, posX + scaleX, std::lerp(posY + scaleY, posY - scaleY, inputValue), posY + scaleY, gInputRGBHighlight);
+}
+
+void DisplayInputs(tReplayTick* tick) {
+	auto inputs = &tick->v4;
+	DrawInputTriangle((fInputBaseXPosition - 0.005) * GetAspectRatioInv(), fInputBaseYPosition, 0.08 * GetAspectRatioInv(), 0.07, 1 - (inputs->nSteering / 8192.0), true);
+	DrawInputTriangle((fInputBaseXPosition + 0.08) * GetAspectRatioInv(), fInputBaseYPosition, -0.08 * GetAspectRatioInv(), 0.07, inputs->nSteering / -8192.0, false);
+	DrawInputTriangleY((fInputBaseXPosition + 0.0375) * GetAspectRatioInv(), fInputBaseYPosition - 0.05, 0.035 * GetAspectRatioInv(), 0.045, 1 - inputs->fThrottle, true);
+	DrawInputTriangleY((fInputBaseXPosition + 0.0375) * GetAspectRatioInv(), fInputBaseYPosition + 0.05, 0.035 * GetAspectRatioInv(), -0.045, inputs->fBrake, false);
+
+	//DrawInputTriangleY((fInputBaseXPosition + 0.225) * GetAspectRatioInv(), fInputBaseYPosition - 0.04, 0.035 * GetAspectRatioInv(), 0.035, 1 - (inputs->keys[INPUT_GEAR_UP] / 128.0), true);
+	//DrawInputTriangleY((fInputBaseXPosition + 0.225) * GetAspectRatioInv(), fInputBaseYPosition + 0.04, 0.035 * GetAspectRatioInv(), -0.035, inputs->keys[INPUT_GEAR_DOWN] / 128.0, false);
+
+	DrawInputRectangle((fInputBaseXPosition + 0.325) * GetAspectRatioInv(), fInputBaseYPosition + 0.05, 0.03 * GetAspectRatioInv(), 0.03, inputs->bNOS);
+	DrawInputRectangle((fInputBaseXPosition + 0.425) * GetAspectRatioInv(), fInputBaseYPosition + 0.05, 0.03 * GetAspectRatioInv(), 0.03, inputs->fEBrake);
 }
 
 // special cases for some player names that are above 16 chars
@@ -833,20 +922,20 @@ void TimeTrialRenderLoop() {
 
 	if (!ShouldGhostRun()) return;
 
-	// todo
-	/*if (!GetIsGamePaused()) {
+	if (!GetIsGamePaused()) {
 		if (bViewReplayMode) {
 			auto ghost = GetViewReplayGhost();
 
-			auto tick = ghost->GetCurrentTick();
-			if (ghost->aTicks.size() > tick) {
-				DisplayInputs(&ghost->aTicks[tick].v1.inputs);
+			if (auto tick = ghost->GetInterpolatedTick(ghost->GetPlaybackTime())) {
+				DisplayInputs(tick);
 			}
 		}
 		else if (bShowInputsWhileDriving) {
-			DisplayInputs(GetLocalPlayerInterface<IInput>()->GetControls());
+			tReplayTick tmp;
+			tmp.Collect(GetLocalPlayerVehicle());
+			DisplayInputs(&tmp);
 		}
-	}*/
+	}
 
 	DisplayPlayerNames();
 }
@@ -875,6 +964,7 @@ void DebugMenu() {
 	if (DrawMenuOption("Options")) {
 		ChloeMenuLib::BeginMenu();
 
+		QuickValueEditor("Show Inputs While Driving", bShowInputsWhileDriving);
 		QuickValueEditor("Player Name Override", sPlayerNameOverride, sizeof(sPlayerNameOverride));
 
 		if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND) {
@@ -972,6 +1062,7 @@ void DebugMenu() {
 			DrawMenuOption(std::format("GetCountdownNumberToDisplay - {}", Race::GetCountdownNumberToDisplay(pCurrentRace)));
 			DrawMenuOption(std::format("bFinishedRacing - {}", Player::pPlayersByIndex[0]->bFinishedRacing));
 			DrawMenuOption(std::format("GetLocalPlayerVehicle() - {:X}", (uintptr_t)GetLocalPlayerVehicle()));
+			DrawMenuOption(std::format("GetLocalPlayerDriver() - {:X}", (uintptr_t)GetLocalPlayerDriver()));
 			DrawMenuOption(std::format("GetNumOpponentsInRace() - {}", GetNumOpponentsInRace()));
 			for (int i = 0; i < GetNumOpponentsInRace(); i++) {
 				auto car = GetCarByRacerId(i+1);
