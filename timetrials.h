@@ -88,6 +88,7 @@ struct tReplayTick {
 		uint8_t bNOS;
 		uint8_t pad;
 		int16_t nSteering;
+		float fPlayerSteering;
 	} v4;
 
 	void Collect(Car* pVehicle) {
@@ -116,6 +117,9 @@ struct tReplayTick {
 			v4.fThrottle = controller->pDriver->fThrottle;
 			v4.fBrake = controller->pDriver->fBrake;
 			v4.fEBrake = controller->pDriver->fEBrake;
+			if (pVehicle->nControlMode == REAL_CONTROLLER || pVehicle->nControlMode == DRAG_CONTROLLER) {
+				v4.fPlayerSteering = ((RealDriver*)controller->pDriver)->fPlayerSteering;
+			}
 		}
 		v4.bNOS = CarState::IsNitrousOn(&pVehicle->State);
 		v4.fNitroCharge = pVehicle->State.fNitrous;
@@ -143,6 +147,8 @@ struct tReplayTick {
 			controller->pDriver->fBrake = v4.fBrake;
 			controller->pDriver->fEBrake = v4.fEBrake;
 		}
+		pVehicle->State.fNitrous = v4.fNitroCharge;
+
 		if (CarState::IsNitrousOn(&pVehicle->State) != v4.bNOS) {
 			if (v4.bNOS) {
 				CarState::StartNitrous(&pVehicle->State);
@@ -151,7 +157,6 @@ struct tReplayTick {
 				CarState::StopNitrous(&pVehicle->State);
 			}
 		}
-		pVehicle->State.fNitrous = v4.fNitroCharge;
 	}
 };
 
@@ -203,6 +208,8 @@ public:
 		for (auto& tick : aTicks) {
 			if (tick.v1.timer <= raceTime) pClosestWithoutGoingOver = &tick;
 		}
+
+		if (pClosestWithoutGoingOver->v1.state.vPosition.x == 0.0) return nullptr;
 
 		if (pClosestWithoutGoingOver->v1.timer == raceTime) return pClosestWithoutGoingOver;
 		if (pClosestWithoutGoingOver == &aTicks[aTicks.size()-1]) return nullptr;
@@ -282,6 +289,10 @@ void RunGhost(Car* veh, tReplayGhost* ghost) {
 	}
 
 	if (!ghost->IsValid()) return;
+
+	if (veh->nControlMode == REAL_CONTROLLER || veh->nControlMode == DRAG_CONTROLLER) {
+		Car::SetControlMode(veh, NO_CONTROLLER);
+	}
 
 	auto tick = ghost->GetInterpolatedTick(ghost->GetPlaybackTime());
 	if (!tick) {
@@ -481,14 +492,14 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 		inFile.read((char*)&state.v1, sizeof(state.v1));
 		if (fileVersion >= 3) {
 			inFile.read((char*)&state.v3, sizeof(state.v3));
-			// padding added by the compiler, apparently
-			if (fileVersion < 4) {
-				int tmp = 0;
-				inFile.read((char*)&tmp, sizeof(tmp));
-			}
 		}
 		if (fileVersion >= 4) {
 			inFile.read((char*)&state.v4, sizeof(state.v4));
+		}
+		// padding added by the compiler, apparently
+		if (fileVersion == 3 || fileVersion == 4) {
+			int tmp = 0;
+			inFile.read((char*)&tmp, sizeof(tmp));
 		}
 		ghost->aTicks.push_back(state);
 	}
@@ -755,8 +766,10 @@ void DrawInputRectangle(float posX, float posY, float scaleX, float scaleY, floa
 
 void DisplayInputs(tReplayTick* tick) {
 	auto inputs = &tick->v4;
-	DrawInputTriangle((fInputBaseXPosition - 0.005) * GetAspectRatioInv(), fInputBaseYPosition, 0.08 * GetAspectRatioInv(), 0.07, 1 - (inputs->nSteering / 8192.0), true);
-	DrawInputTriangle((fInputBaseXPosition + 0.08) * GetAspectRatioInv(), fInputBaseYPosition, -0.08 * GetAspectRatioInv(), 0.07, inputs->nSteering / -8192.0, false);
+	//DrawInputTriangle((fInputBaseXPosition - 0.005) * GetAspectRatioInv(), fInputBaseYPosition, 0.08 * GetAspectRatioInv(), 0.07, 1 - (inputs->nSteering / 8192.0), true);
+	//DrawInputTriangle((fInputBaseXPosition + 0.08) * GetAspectRatioInv(), fInputBaseYPosition, -0.08 * GetAspectRatioInv(), 0.07, inputs->nSteering / -8192.0, false);
+	DrawInputTriangle((fInputBaseXPosition - 0.005) * GetAspectRatioInv(), fInputBaseYPosition, 0.08 * GetAspectRatioInv(), 0.07, 1 - (inputs->fPlayerSteering), true);
+	DrawInputTriangle((fInputBaseXPosition + 0.08) * GetAspectRatioInv(), fInputBaseYPosition, -0.08 * GetAspectRatioInv(), 0.07, -inputs->fPlayerSteering, false);
 	DrawInputTriangleY((fInputBaseXPosition + 0.0375) * GetAspectRatioInv(), fInputBaseYPosition - 0.05, 0.035 * GetAspectRatioInv(), 0.045, 1 - inputs->fThrottle, true);
 	DrawInputTriangleY((fInputBaseXPosition + 0.0375) * GetAspectRatioInv(), fInputBaseYPosition + 0.05, 0.035 * GetAspectRatioInv(), -0.045, inputs->fBrake, false);
 
@@ -1064,22 +1077,7 @@ void DebugMenu() {
 			DrawMenuOption(std::format("GetLocalPlayerVehicle() - {:X}", (uintptr_t)GetLocalPlayerVehicle()));
 			DrawMenuOption(std::format("GetLocalPlayerDriver() - {:X}", (uintptr_t)GetLocalPlayerDriver()));
 			DrawMenuOption(std::format("GetNumOpponentsInRace() - {}", GetNumOpponentsInRace()));
-			for (int i = 0; i < GetNumOpponentsInRace(); i++) {
-				auto car = GetCarByRacerId(i+1);
-				auto ghost = GetGhostForOpponent(i);
-				DrawMenuOption(std::format("opponent[i] - {:X}", (uintptr_t)car));
-				DrawMenuOption(std::format("nMovementMode - {}", (int)car->nMovementMode));
-				DrawMenuOption(std::format("GetRigidBody() - {:X}", (uintptr_t)car->pMover->GetRigidBody()));
-				auto score = DriftManager::GetLeaderBoardScore(car->pDriverInfo->DriverNumber);
-				DrawMenuOption(std::format("score - {:X}", (uintptr_t)score));
-				DrawMenuOption(std::format("fPoints - {}", score ? score->fScore : 0));
-				if (ghost) {
-					DrawMenuOption(std::format("ghost->aTicks.size() - {}", ghost->aTicks.size()));
-					DrawMenuOption(std::format("ghost->nStartTime - {}", ghost->nStartTime));
-					DrawMenuOption(std::format("ghost->nFinishTime - {}", ghost->nFinishTime));
-					DrawMenuOption(std::format("ghost->nFinishPoints - {}", ghost->nFinishPoints));
-				}
-			}
+			DrawMenuOption(std::format("GetPlaybackTime() - {}", PlayerPBGhost.GetPlaybackTime()));
 			ChloeMenuLib::EndMenu();
 		}
 	}
