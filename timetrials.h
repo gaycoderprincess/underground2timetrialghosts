@@ -31,7 +31,7 @@ enum eDifficulty {
 int nDifficulty = DIFFICULTY_HARD;
 bool bChallengesOneGhostOnly = false;
 bool bChallengesPBGhost = false;
-bool bCheckFileIntegrity = false;
+bool bCheckFileIntegrity = true;
 bool bPracticeOpponentsOnly = false;
 
 void DoConfigSave() {
