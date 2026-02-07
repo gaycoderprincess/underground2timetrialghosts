@@ -84,6 +84,8 @@ int IsCarBlinkingOrPoofedHooked(Car* pCar, eView* view) {
 		return Car::IsBlinking(pCar) ? nCarBlinkCounter & 1 : 0;
 	}
 
+	if (pCar->nControlMode == TRAFFIC_CONTROLLER) return false;
+	
 	if (nGhostVisuals == GHOST_SHOW) return IsPlayerStaging();
 
 	bool hide = nGhostVisuals == GHOST_HIDE;
