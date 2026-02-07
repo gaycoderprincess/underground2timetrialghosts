@@ -10,7 +10,7 @@
 #include "nfsug2.h"
 #include "chloemenulib.h"
 
-bool bChallengeSeriesMode = false;
+bool bChallengeSeriesMode = true;
 
 #include "util.h"
 #include "d3dhook.h"
@@ -20,8 +20,6 @@ bool bChallengeSeriesMode = false;
 
 uint32_t nCarBlinkCounter = 0;
 void MainLoop(float delta) {
-	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) bChallengeSeriesMode = false;
-
 	DLLDirSetter _setdir;
 
 	static double time = 0;
@@ -38,11 +36,9 @@ void RenderLoop() {
 	UnlockAllThings = true;
 
 	if (TheGameFlowManager.CurrentGameFlowState == GAMEFLOW_STATE_IN_FRONTEND && !TheGameFlowManager.pSingleFunction) {
-		if (bChallengeSeriesMode) {
-			SkipFE = false;
-			ForceAllAICarsToBeThisType = -1;
-		}
-		bChallengeSeriesMode = false;
+		SkipFE = false;
+		ForceAllAICarsToBeThisType = -1;
+		if (QRTrackSelectScreenManager::pInstance) bChallengeSeriesMode = false;
 	}
 
 	if (TheGameFlowManager.CurrentGameFlowState != GAMEFLOW_STATE_RACING) {
@@ -85,7 +81,7 @@ int IsCarBlinkingOrPoofedHooked(Car* pCar, eView* view) {
 	}
 
 	if (pCar->nControlMode == TRAFFIC_CONTROLLER) return false;
-	
+
 	if (nGhostVisuals == GHOST_SHOW) return IsPlayerStaging();
 
 	bool hide = nGhostVisuals == GHOST_HIDE;
@@ -108,6 +104,12 @@ auto DriftScoreOverrides_orig = (bool(__thiscall*)(void*))nullptr;
 bool __thiscall DriftScoreOverrides(void* pThis) {
 	RunGhosts();
 	return DriftScoreOverrides_orig(pThis);
+}
+
+auto QuickRaceMenu_orig = (void(*)())nullptr;
+void QuickRaceMenuHooked() {
+	bChallengeSeriesMode = false;
+	return QuickRaceMenu_orig();
 }
 
 BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
@@ -157,6 +159,8 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
 			NyaHookLib::Patch<uint8_t>(0x4AEF40, 0xEB);
 			AddOption_orig = (void(__thiscall*)(IconScrollerMenu*, IconOption*))(*(uintptr_t*)0x797528);
 			NyaHookLib::Patch(0x797528, &AddOptionHooked);
+
+			QuickRaceMenu_orig = (void(*)())NyaHookLib::PatchRelative(NyaHookLib::CALL, 0x4FC06F, &QuickRaceMenuHooked);
 
 			DriftScoreOverrides_orig = (bool(__thiscall*)(void*))NyaHookLib::PatchRelative(NyaHookLib::CALL, 0x56DE8D, &DriftScoreOverrides);
 

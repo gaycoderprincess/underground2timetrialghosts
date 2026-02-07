@@ -25,7 +25,7 @@ char sPlayerNameOverride[nPlayerNameLength] = "";
 enum eDifficulty {
 	DIFFICULTY_EASY, // slowest ghost only for every track
 	DIFFICULTY_NORMAL, // first 3 ghosts in the folder
-	DIFFICULTY_HARD, // quickest ghost only for every track
+	DIFFICULTY_HARD, // quickest ghosts for every track
 	NUM_DIFFICULTY,
 };
 int nDifficulty = DIFFICULTY_HARD;
