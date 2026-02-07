@@ -761,6 +761,7 @@ void DrawInputTriangleY(float posX, float posY, float sizeX, float sizeY, float 
 
 void DrawInputRectangle(float posX, float posY, float scaleX, float scaleY, float inputValue) {
 	DrawRectangle(posX - scaleX, posX + scaleX, posY - scaleY, posY + scaleY, gInputRGBBackground);
+	if (inputValue == 0.0) return;
 	DrawRectangle(posX - scaleX, posX + scaleX, std::lerp(posY + scaleY, posY - scaleY, inputValue), posY + scaleY, gInputRGBHighlight);
 }
 

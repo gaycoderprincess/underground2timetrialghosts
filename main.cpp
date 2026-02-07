@@ -147,6 +147,8 @@ BOOL WINAPI DllMain(HINSTANCE, DWORD fdwReason, LPVOID) {
 			NyaHookLib::Patch<uint8_t>(0x56F7D2, 0xEB); // disable gained position bonus
 			NyaHookLib::Patch<uint8_t>(0x56EFD3, 0xEB); // disable lead lap bonus
 
+			NyaHookLib::Fill(0x45361B, 0x90, 6); // disable automatic camera change checks
+
 			// skip other menu options
 			NyaHookLib::Patch<uint8_t>(0x4AEE64, 0xEB);
 			NyaHookLib::Patch<uint8_t>(0x4AEEDF, 0xEB);
