@@ -10,6 +10,7 @@ std::string GetCarNameForGhost(const std::string& carPreset) {
 }
 
 uint32_t nChallengeSeriesCar = 0;
+int nChallengeSeriesStockCar = -1;
 class ChallengeSeriesEvent {
 public:
 	int nTrackNumber;
@@ -92,6 +93,7 @@ public:
 		bChallengeSeriesMode = true;
 		nChallengeSeriesCar = bStringHash(sCarPreset.c_str());
 		ForceAllAICarsToBeThisType = CarTypeInfoArray[GetCarID()].Type;
+		nChallengeSeriesStockCar = sCarPreset.starts_with("STOCK_") ? GetCarID() : -1;
 
 		// make preset car fully tuned
 		if (auto car = FindFEPresetCar(nChallengeSeriesCar)) {
@@ -109,7 +111,7 @@ public:
 		SkipFEShortTrackRace = nEventType == EVENT_SHORT_TRACK;
 		SkipFEPoint2Point = TrackInfo::GetTrackInfo(nTrackNumber)->Point2Point;
 		SkipFENumPlayerCars = 1;
-		SkipFENumAICars = bChallengesOneGhostOnly ? 1 : 3;
+		SkipFENumAICars = bChallengesOneGhostOnly ? 1 : 4;
 		SkipFEPlayerCarUpgrades[0] = 3; // full upgrades
 		SkipFENumLaps = GetNumLaps();
 
@@ -150,7 +152,7 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4024, "PresetCar/240SX_CUSTOM", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4088, "CALEB_GTO", EVENT_RACE, 2),
-		ChallengeSeriesEvent(4107, "G35_AI_PRESET_1", EVENT_RACE, 1), // marathon
+		ChallengeSeriesEvent(4107, "G35_AI_PRESET_1", EVENT_RACE, 1),
 };
 
 ChallengeSeriesEvent* GetChallengeEvent(int id) {
@@ -209,8 +211,8 @@ void ChallengeSeriesMenu() {
 					RideInfo::FillWithPreset(&TopOrFullScreenRide, bStringHash(event.sCarPreset.c_str()));
 					GarageMainScreen::SetRideInfo((GarageMainScreen*)FEngFindScreen("GarageMain.fng"), &TopOrFullScreenRide, SET_RIDE_INFO_REASON_CATCHALL);
 				}
-			}*/
-			sLastSelectedCar = event.sCarPreset;
+			}
+			sLastSelectedCar = event.sCarPreset;*/
 
 			std::string carName = CarTypeInfoArray[event.GetCarID()].ManufacturerName;
 			std::transform(carName.begin(), carName.end(), carName.begin(), [](char c){ return std::tolower(c); });
@@ -237,8 +239,15 @@ void ChallengeSeriesMenu() {
 
 void __thiscall RideInfoInitHooked(RideInfo* pThis, int a1, int a2, int a3, int a4) {
 	RideInfo::Init(pThis, a1, a2, a3, a4);
-	RideInfo::FillWithPreset(pThis, nChallengeSeriesCar);
-	RideInfo::SetCompositeNameHash(pThis, 1);
+	if (nChallengeSeriesStockCar >= 0) {
+		RideInfo::Init(pThis, nChallengeSeriesStockCar, 1, 0, 0);
+		RideInfo::SetStockParts(pThis, 0);
+		RideInfo::SetCompositeNameHash(pThis, 1);
+	}
+	else {
+		RideInfo::FillWithPreset(pThis, nChallengeSeriesCar);
+		RideInfo::SetCompositeNameHash(pThis, 1);
+	}
 }
 
 PresetCar* FindFEPresetCarHooked(uint32_t hash) {
