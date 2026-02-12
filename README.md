@@ -14,6 +14,7 @@ A mod for Need for Speed: Underground 2 that replaces Quick Race opponents with 
 
 - A built-in set of events in the Challenge Series to compete with other players on
 - Ghosts include a checksum of the player's game files, allowing you to check if someone's made any potentially unfair modifications
+- Ghosts include player inputs, and while they're not directly usable for playback (the game is not deterministic) it can still be used to verify legitimacy
 - The mod includes a basic anti-cheat, preventing common methods of cheating
 
 ## Building
