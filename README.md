@@ -10,6 +10,12 @@ A mod for Need for Speed: Underground 2 that replaces Quick Race opponents with 
 - Press F5 to open the mod's menu and play the included Challenge Series.
 - Enjoy, nya~ :3
 
+## Features
+
+- A built-in set of events in the Challenge Series to compete with other players on
+- Ghosts include a checksum of the player's game files, allowing you to check if someone's made any potentially unfair VLT modifications
+- The mod includes a basic anti-cheat, preventing common methods of cheating
+
 ## Building
 
 Building is done on an Arch Linux system with CLion and vcpkg being used for the build process. 
