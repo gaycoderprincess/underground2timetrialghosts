@@ -2,6 +2,7 @@
 #include <mutex>
 #include <filesystem>
 #include <format>
+#include <thread>
 #include <toml++/toml.hpp>
 
 #include "nya_dx9_hookbase.h"

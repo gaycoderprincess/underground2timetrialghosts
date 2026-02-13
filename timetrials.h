@@ -904,8 +904,17 @@ void DisplayLeaderboard() {
 				if (!ghost.nGameFilesHash) {
 					str += " (Old ghost, no game data info)";
 				}
-				else if (ghost.nGameFilesHash != nLocalGameFilesHash) {
-					str += std::format(" (Game data mismatch, {})", GetGameDataHashName(ghost.nGameFilesHash));
+				else {
+					str += " (";
+					if (ghost.nGameFilesHash != nLocalGameFilesHash) {
+						str += "Game data mismatch, ";
+					}
+					auto dataName = GetGameDataHashName(ghost.nGameFilesHash);
+					if (dataName.empty()) str += std::format("{:X}", ghost.nGameFilesHash);
+					else {
+						str += std::format("{:X} {}", ghost.nGameFilesHash, dataName);
+					}
+					str += ")";
 				}
 			}
 			DrawString(data, str);
