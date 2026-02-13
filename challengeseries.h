@@ -150,9 +150,14 @@ std::vector<ChallengeSeriesEvent> aNewChallengeSeries = {
 		//ChallengeSeriesEvent(4221, "DAVIDCHOE", EVENT_DRAG), // airport drag is super boring
 		ChallengeSeriesEvent(4604, "PresetCar/SKYLINE_CUSTOM", EVENT_DRIFT, 2),
 		ChallengeSeriesEvent(4713, "TOM_G35", EVENT_RACE, 2),
+		ChallengeSeriesEvent(4708, "DAVIDCHOE", EVENT_SHORT_TRACK, 2),
 		ChallengeSeriesEvent(4024, "PresetCar/240SX_CUSTOM", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4088, "CALEB_GTO", EVENT_RACE, 2),
 		ChallengeSeriesEvent(4107, "G35_AI_PRESET_1", EVENT_RACE, 1),
+
+		// 4706 - dyno
+		// 4707 - bayview speedway roam
+		// 4709 - bayview speedway drag
 };
 
 ChallengeSeriesEvent* GetChallengeEvent(int id) {
@@ -174,6 +179,7 @@ void ChallengeSeriesMenu() {
 	bChallengeSeriesMode = true;
 	for (auto& event : aNewChallengeSeries) {
 		auto trackName = (std::string)GetLocalizedString(CalcTrackNameHash(event.nTrackNumber, false));
+		if (event.nTrackNumber == 4708) trackName = "Bayview Speedway Test Track";
 		if (event.bReversed) trackName += " Reversed";
 		if (trackName.starts_with("Bayview Speedway Track ")) {
 			trackName.erase(trackName.begin(), trackName.begin() + 23);
