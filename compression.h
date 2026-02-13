@@ -49,8 +49,9 @@ void WriteStringToFile(CwoeeOStream& file, const char* string) {
 void EncryptGhostData(uint8_t* in, size_t size, uint8_t* out) {
 	uint8_t tmp = 0;
 	for (size_t i = 0; i < size; i++) {
+		auto origValue = in[i];
 		out[i] = in[i] ^ tmp;
-		tmp += 0x10;
+		tmp += origValue + 0x10;
 	}
 }
 
@@ -58,7 +59,7 @@ void DecryptGhostData(uint8_t* in, size_t size, uint8_t* out) {
 	uint8_t tmp = 0;
 	for (size_t i = 0; i < size; i++) {
 		out[i] = in[i] ^ tmp;
-		tmp += 0x10;
+		tmp += out[i] + 0x10;
 	}
 }
 
@@ -110,7 +111,7 @@ bool EncryptPB(const std::filesystem::path& filePath) {
 
 bool WriteEncryptedPB(CwoeeOStream* file, const std::filesystem::path& filePath) {
 	auto encrypted = new uint8_t[file->aData.size()];
-	EncryptGhostData(encrypted, file->aData.size(), (uint8_t*)&file->aData[0]);
+	EncryptGhostData((uint8_t*)&file->aData[0], file->aData.size(), encrypted);
 
 	auto outFile = std::ofstream(filePath.string() + "2", std::ios::out | std::ios::binary);
 	if (!outFile.is_open()) {
