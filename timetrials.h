@@ -1,3 +1,5 @@
+#include "compression.h"
+
 const int nLocalReplayVersion = 4;
 const int nMaxNumGhostsToCheck = 16;
 const int nPlayerNameLength = 16;
@@ -374,11 +376,7 @@ void SavePB(tReplayGhost* ghost, const std::string& car, int track, int lapCount
 	std::filesystem::create_directory("CwoeeGhosts/Practice");
 
 	auto fileName = GetGhostFilename(car, track, TheRaceParameters.TrackDirection == eDIRECTION_BACKWARD, lapCount, 0);
-	auto outFile = std::ofstream(fileName, std::ios::out | std::ios::binary);
-	if (!outFile.is_open()) {
-		WriteLog("Failed to save " + fileName + "!");
-		return;
-	}
+	auto outFile = CwoeeOStream();
 
 	char signature[4] = "nya";
 	int fileVersion = nLocalReplayVersion;
@@ -401,6 +399,11 @@ void SavePB(tReplayGhost* ghost, const std::string& car, int track, int lapCount
 	int count = ghost->aTicks.size();
 	outFile.write((char*)&count, sizeof(count));
 	outFile.write((char*)&ghost->aTicks[0], sizeof(ghost->aTicks[0]) * count);
+
+	if (!WriteEncryptedPB(&outFile, fileName)) {
+		WriteLog("Failed to save " + fileName + "!");
+		return;
+	}
 }
 
 void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackReversed, int lapCount, int opponentId, const char* folder = nullptr) {
@@ -410,11 +413,43 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 	ghost->Invalidate();
 
 	auto fileName = GetGhostFilename(car, track, trackReversed, lapCount, opponentId, folder);
-	auto inFile = std::ifstream(fileName, std::ios::in | std::ios::binary);
-	if (!std::filesystem::exists(fileName)) return;
-	if (!inFile.is_open()) {
-		return;
+
+	CwoeeIStream* decompress = nullptr;
+
+	auto newFileName = fileName + "2";
+	if (std::filesystem::exists(newFileName)) {
+		decompress = OpenEncryptedPB(newFileName);
+		if (!decompress) {
+			if (TheGameFlowManager.CurrentGameFlowState > GAMEFLOW_STATE_IN_FRONTEND) {
+				WriteLog("Invalid ghost for " + fileName);
+			}
+			return;
+		}
+
+		// delete old ghost if a new one exists
+		if (std::filesystem::exists(fileName)) {
+			std::filesystem::remove(fileName);
+		}
 	}
+	else {
+		if (std::filesystem::exists(fileName)) {
+			decompress = OpenRawPB(fileName);
+			if (!decompress) {
+				if (TheGameFlowManager.CurrentGameFlowState > GAMEFLOW_STATE_IN_FRONTEND) {
+					WriteLog("Invalid ghost for " + fileName);
+				}
+				return;
+			}
+		}
+		else {
+			if (TheGameFlowManager.CurrentGameFlowState > GAMEFLOW_STATE_IN_FRONTEND) {
+				WriteLog("No ghost found for " + fileName);
+			}
+			return;
+		}
+	}
+
+	auto& inFile = *decompress;
 
 	int fileVersion;
 
