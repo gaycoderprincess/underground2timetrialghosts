@@ -451,6 +451,14 @@ void LoadPB(tReplayGhost* ghost, const std::string& car, int track, bool trackRe
 
 	auto& inFile = *decompress;
 
+	class temp {
+	public:
+		CwoeeIStream* data;
+
+		temp(CwoeeIStream* a) : data(a) {}
+		~temp() { delete data; }
+	} dtor(decompress);
+
 	int fileVersion;
 
 	uint32_t signature = 0;
