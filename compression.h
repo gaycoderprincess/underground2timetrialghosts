@@ -46,6 +46,22 @@ void WriteStringToFile(CwoeeOStream& file, const char* string) {
 	file.write(string, len);
 }
 
+void EncryptGhostData(uint8_t* in, size_t size, uint8_t* out) {
+	uint8_t tmp = 0;
+	for (size_t i = 0; i < size; i++) {
+		out[i] = in[i] ^ tmp;
+		tmp += 0x10;
+	}
+}
+
+void DecryptGhostData(uint8_t* in, size_t size, uint8_t* out) {
+	uint8_t tmp = 0;
+	for (size_t i = 0; i < size; i++) {
+		out[i] = in[i] ^ tmp;
+		tmp += 0x10;
+	}
+}
+
 CwoeeIStream* OpenEncryptedPB(const std::filesystem::path& filePath) {
 	auto size = std::filesystem::file_size(filePath);
 	auto inFile = std::ifstream(filePath, std::ios::in | std::ios::binary);
@@ -53,12 +69,7 @@ CwoeeIStream* OpenEncryptedPB(const std::filesystem::path& filePath) {
 
 	auto data = new uint8_t[size];
 	inFile.read((char*)data, size);
-
-	uint8_t tmp = 0;
-	for (size_t i = 0; i < size; i++) {
-		data[i] ^= tmp;
-		tmp += 0x10;
-	}
+	DecryptGhostData(data, size, data);
 
 	return new CwoeeIStream(data, size);
 }
@@ -84,27 +95,22 @@ bool EncryptPB(const std::filesystem::path& filePath) {
 	inFile.read((char*)data, size);
 
 	auto encrypted = new uint8_t[size];
-
-	uint8_t tmp = 0;
-	for (size_t i = 0; i < size; i++) {
-		encrypted[i] = data[i] ^ tmp;
-		tmp += 0x10;
-	}
+	EncryptGhostData(data, size, encrypted);
+	delete[] data;
 
 	auto outFile = std::ofstream(filePath.string() + "2", std::ios::out | std::ios::binary);
-	if (!outFile.is_open()) return false;
+	if (!outFile.is_open()) {
+		delete[] encrypted;
+		return false;
+	}
 	outFile.write((char*)encrypted, size);
+	delete[] encrypted;
 	return true;
 }
 
 bool WriteEncryptedPB(CwoeeOStream* file, const std::filesystem::path& filePath) {
 	auto encrypted = new uint8_t[file->aData.size()];
-
-	uint8_t tmp = 0;
-	for (size_t i = 0; i < file->aData.size(); i++) {
-		encrypted[i] = file->aData[i] ^ tmp;
-		tmp += 0x10;
-	}
+	EncryptGhostData(encrypted, file->aData.size(), (uint8_t*)&file->aData[0]);
 
 	auto outFile = std::ofstream(filePath.string() + "2", std::ios::out | std::ios::binary);
 	if (!outFile.is_open()) {
