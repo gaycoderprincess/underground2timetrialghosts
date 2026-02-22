@@ -14,11 +14,7 @@ enum eCwoeeEventType {
 	EVENT_RACE,
 	EVENT_DRAG,
 	EVENT_DRIFT,
-	EVENT_URL,
 	EVENT_SHORT_TRACK,
-	EVENT_OUTRUN,
-	EVENT_FREE_RUN,
-	EVENT_BURNOUT,
 };
 
 Car* GetNthCar(int n) {
